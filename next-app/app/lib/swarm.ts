@@ -1,128 +1,168 @@
-// lib/swarm.ts
+// Architect – swarm.ts
+// Person C: Bot class and SwarmController for stigmergic assembly
+
 import * as THREE from 'three';
-import type { Vector3 } from './types';
+import { Slot, updateAvailableSlots } from './slots';
+
+export type BotState = 'free' | 'movingToSlot' | 'attached';
 
 export class Bot {
   id: number;
   mesh: THREE.Group;
-  // Physical position in the scene
   position: THREE.Vector3;
-  // Where the bot WANTS to go
-  target: THREE.Vector3;
-  state: 'idle' | 'moving' | 'locked';
+  state: BotState = 'free';
+  targetSlotId: number | null = null;
 
-  constructor(id: number, mesh: THREE.Group) {
+  constructor(id: number, mesh: THREE.Group, initialPos: THREE.Vector3) {
     this.id = id;
     this.mesh = mesh;
-    this.position = mesh.position.clone();
-    this.target = mesh.position.clone();
-    this.state = 'idle';
+    this.position = initialPos.clone();
+    this.mesh.position.copy(this.position);
+  }
+
+  setColorAttached() {
+    // Change emissive color when attached to indicate filled slot
+    this.mesh.traverse((obj: THREE.Object3D) => {
+      const m = (obj as any).material as THREE.MeshStandardMaterial | undefined;
+      if (m && 'emissive' in m) {
+        m.emissive = new THREE.Color(0xf97316); // orange
+        m.emissiveIntensity = 1.5;
+      }
+    });
+  }
+  
+  setColorFree() {
+    // Reset to blue emissive when free
+    this.mesh.traverse((obj: THREE.Object3D) => {
+      const m = (obj as any).material as THREE.MeshStandardMaterial | undefined;
+      if (m && 'emissive' in m) {
+        m.emissive = new THREE.Color(0x3b82f6); // blue
+        m.emissiveIntensity = 1.5;
+      }
+    });
   }
 }
 
 export class SwarmController {
   bots: Bot[];
-  speed: number = 8.0; // units per second
+  slots: Slot[] = [];
+  speed = 3; // units/sec
 
   constructor(bots: Bot[]) {
     this.bots = bots;
   }
 
-  /**
-   * Assigns targets ensuring bots build bottom-up.
-   * 'targets' is already sorted by the Stigmergy algo (foundation → roof),
-   * so Bot[0] takes the foundation, Bot[N] ends up on top.
-   */
-  setTargets(targets: Vector3[]) {
-    // 1. Scatter any bots we don't need (send them to side "parking lot")
-    for (let i = targets.length; i < this.bots.length; i++) {
-      this.bots[i].target.set(
-        -10 + Math.random() * 2,
-        0.3,
-        (Math.random() - 0.5) * 10
+  setSlots(slots: Slot[]) {
+    this.slots = slots;
+    
+    // Check for insufficient bots
+    if (slots.length > this.bots.length) {
+      console.warn(
+        `⚠️ Insufficient bots: ${this.bots.length} bots available for ${slots.length} slots. ` +
+        `Structure will be incomplete (${slots.length - this.bots.length} slots will remain empty).`
       );
-      this.bots[i].state = 'moving';
-      // Reset color to Blue (idle/moving)
-      this.setBotColor(this.bots[i], 0x4f7dff);
     }
+    
+    // Reset all bots to free state when new structure is set
+    this.bots.forEach(bot => {
+      bot.state = 'free';
+      bot.targetSlotId = null;
+      bot.setColorFree();
+    });
+  }
 
-    // 2. Assign active bots to ordered targets
-    const n = Math.min(targets.length, this.bots.length);
-    for (let i = 0; i < n; i++) {
-      const t = targets[i];
-      this.bots[i].target.set(t.x, t.y, t.z);
-      this.bots[i].state = 'moving';
-      this.setBotColor(this.bots[i], 0x4f7dff);
-    }
+  scatter() {
+    // Clear structure and scatter bots randomly
+    this.slots = [];
+    this.bots.forEach(bot => {
+      bot.state = 'free';
+      bot.targetSlotId = null;
+      bot.position.set(
+        (Math.random() - 0.5) * 6,
+        0.3 + Math.random() * 0.5,
+        (Math.random() - 0.5) * 6
+      );
+      bot.mesh.position.copy(bot.position);
+      bot.setColorFree();
+    });
   }
 
   /**
-   * Scatters all bots to random positions and resets their state.
-   * Useful for resetting the swarm after a build.
+   * Stigmergic assignment: bots autonomously choose nearest available slot.
+   * No central coordinator - purely reactive to environment state.
    */
-  scatter() {
+  private assignTargets() {
+    const available = this.slots.filter(s => s.state === 'available');
+    if (available.length === 0) return;
+
+    // Track which slots are already being targeted to avoid double-assignment
+    const targeted = new Set<number>(
+      this.bots
+        .filter(b => b.state === 'movingToSlot' && b.targetSlotId !== null)
+        .map(b => b.targetSlotId!)
+    );
+
     for (const bot of this.bots) {
-      bot.state = 'moving';
-      bot.target.set(
-        (Math.random() - 0.5) * 8,
-        0.3 + Math.random() * 0.5,
-        (Math.random() - 0.5) * 8
-      );
-      // Reset color to blue (moving/idle state)
-      this.setBotColor(bot, 0x4f7dff);
+      if (bot.state !== 'free' || bot.targetSlotId !== null) continue;
+      
+      // Pick nearest available slot that's not already targeted
+      let best: Slot | null = null;
+      let bestDist = Infinity;
+      for (const slot of available) {
+        if (targeted.has(slot.id)) continue; // Skip if another bot is already heading there
+        
+        const d = bot.position.distanceTo(slot.position);
+        if (d < bestDist) {
+          bestDist = d;
+          best = slot;
+        }
+      }
+      
+      if (best) {
+        bot.targetSlotId = best.id;
+        bot.state = 'movingToSlot';
+        targeted.add(best.id); // Mark as targeted to prevent double-assignment
+      }
     }
   }
 
   update(dt: number) {
+    // Step 1: Assign free bots to available slots (stigmergic selection)
+    this.assignTargets();
+
+    // Step 2: Move bots toward their targets
     for (const bot of this.bots) {
-      if (bot.state === 'locked') continue;
+      if (bot.state !== 'movingToSlot' || bot.targetSlotId === null) continue;
+      const slot = this.slots[bot.targetSlotId];
+      if (!slot) continue;
 
-      const dist = bot.position.distanceTo(bot.target);
-
-      // Arrival threshold
+      const dir = slot.position.clone().sub(bot.position);
+      const dist = dir.length();
+      
       if (dist < 0.05) {
-        bot.position.copy(bot.target);
+        // Arrived - attach to slot
+        bot.position.copy(slot.position);
         bot.mesh.position.copy(bot.position);
-        bot.state = 'locked';
-
-        // Visual feedback: turn Orange when locked
-        this.setBotColor(bot, 0xffaa00);
-        continue;
-      }
-
-      // Simple P-controller: move towards target
-      const dir = new THREE.Vector3()
-        .subVectors(bot.target, bot.position)
-        .normalize();
-      const moveDist = Math.min(dist, this.speed * dt);
-      bot.position.add(dir.multiplyScalar(moveDist));
-
-      // Sync mesh
-      bot.mesh.position.copy(bot.position);
-
-      // Optional: look at target to make them feel alive
-      if (dist > 0.1) {
-        bot.mesh.lookAt(bot.target);
+        bot.state = 'attached';
+        bot.targetSlotId = null;
+        slot.state = 'filled';
+        bot.setColorAttached();
+        
+        // Stigmergic signaling: filling this slot unlocks dependent slots
+        updateAvailableSlots(this.slots);
+      } else {
+        // Move toward slot with speed falloff for smooth arrival
+        dir.normalize();
+        // Ease out: slower when close for smoother attachment
+        const speedFactor = THREE.MathUtils.clamp(dist / 2, 0.3, 1.5);
+        const step = this.speed * speedFactor * dt;
+        bot.position.addScaledVector(dir, step);
+        bot.mesh.position.copy(bot.position);
+        
+        // Add rotation for visual feedback while moving
+        bot.mesh.rotation.y += 2 * dt;
       }
     }
   }
-
-  private setBotColor(bot: Bot, hex: number) {
-    bot.mesh.traverse((child) => {
-      if (
-        child instanceof THREE.Mesh &&
-        child.material instanceof THREE.MeshStandardMaterial
-      ) {
-        // Only update emissive parts (e.g., the magnet ends)
-        if (
-          child.material.emissive &&
-          (child.material.emissive.r > 0 ||
-            child.material.emissive.g > 0 ||
-            child.material.emissive.b > 0)
-        ) {
-          child.material.emissive.setHex(hex);
-        }
-      }
-    });
-  }
 }
+
