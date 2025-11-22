@@ -202,12 +202,15 @@ export default function Page() {
       const ordered = gravitySortVoxels(voxels);
       const slots = buildSlotsFromVoxels(ordered, CELL_SIZE, FILL_DENSITY);
 
+      console.log(`[Page] Pipeline: ${plan.totalVoxels} plan voxels → ${voxels.length} actual voxels → ${ordered.length} ordered → ${slots.length} slots`);
+      console.log(`[Page] Active mode: ${modeRef.current}`);
+
       const activeMode = modeRef.current;
       swarmRef.current?.setSlots(slots);
       autonomousRef.current?.setSlots(slots);
 
       setStatus(
-        `Generated ${plan.name}: ${plan.components.length} components, ${plan.totalVoxels} voxels`
+        `Generated ${plan.name}: ${plan.components.length} components, ${plan.totalVoxels} voxels → ${slots.length} slots`
       );
     } catch (error) {
       console.error('Failed to generate assembly:', error);

@@ -19,7 +19,7 @@ export class AutonomousBot {
   claimedSlotId: number | null = null;
   
   // Autonomous behavior parameters
-  searchRadius = 15.0; // How far the bot can "see"
+  searchRadius = 50.0; // How far the bot can "see" (increased for 0-49 grid)
   speed = 12.0; // Movement speed (faster assembly)
   
   // Memory (simple cognitive model)
@@ -81,9 +81,9 @@ export class AutonomousBot {
         .map(b => b.claimedSlotId!)
     );
 
-    // Find nearest unclaimed slot within search radius
+    // Find nearest unclaimed slot (no search radius limit - bots can see all available slots)
     let nearestSlot: Slot | null = null;
-    let nearestDist = this.searchRadius;
+    let nearestDist = Infinity;
 
     for (const slot of availableSlots) {
       if (claimedSlotIds.has(slot.id)) continue;
@@ -271,6 +271,8 @@ export class AutonomousSwarmSystem {
    */
   setSlots(slots: Slot[]) {
     this.slots = slots;
+    
+    console.log(`[AutonomousSwarm] Received ${slots.length} slots for ${this.bots.length} bots`);
     
     // Check for insufficient bots
     if (slots.length > this.bots.length) {
