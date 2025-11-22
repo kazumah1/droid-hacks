@@ -22,12 +22,18 @@ export class Bot {
   }
 
   setColorAttached() {
-    // Change emissive color when attached to indicate filled slot
+    // Change color when attached to indicate filled slot
     this.mesh.traverse((obj: THREE.Object3D) => {
-      const m = (obj as any).material as THREE.MeshStandardMaterial | undefined;
-      if (m && 'emissive' in m) {
-        m.emissive = new THREE.Color(0xf97316); // orange
-        m.emissiveIntensity = 1.5;
+      if ((obj as any).isMesh) {
+        const mesh = obj as THREE.Mesh;
+        const m = mesh.material as THREE.MeshStandardMaterial;
+        if (m && 'emissive' in m) {
+          m.color = new THREE.Color(0xf97316); // orange
+          m.emissive = new THREE.Color(0xf97316);
+          m.emissiveIntensity = 0.3;
+          m.metalness = 0.6;
+          m.roughness = 0.4;
+        }
       }
     });
   }
@@ -35,10 +41,16 @@ export class Bot {
   setColorFree() {
     // Reset to blue emissive when free
     this.mesh.traverse((obj: THREE.Object3D) => {
-      const m = (obj as any).material as THREE.MeshStandardMaterial | undefined;
-      if (m && 'emissive' in m) {
-        m.emissive = new THREE.Color(0x3b82f6); // blue
-        m.emissiveIntensity = 1.5;
+      if ((obj as any).isMesh) {
+        const mesh = obj as THREE.Mesh;
+        const m = mesh.material as THREE.MeshStandardMaterial;
+        if (m && 'emissive' in m) {
+          m.color = new THREE.Color(0x3b82f6); // blue
+          m.emissive = new THREE.Color(0x3b82f6);
+          m.emissiveIntensity = 0.6;
+          m.metalness = 0.5;
+          m.roughness = 0.4;
+        }
       }
     });
   }

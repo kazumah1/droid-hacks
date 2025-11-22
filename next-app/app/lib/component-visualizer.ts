@@ -45,10 +45,12 @@ export function createComponentVisualizations(
       const geometry = new THREE.BoxGeometry(cellSize * 0.9, cellSize * 0.9, cellSize * 0.9);
       const material = new THREE.MeshStandardMaterial({
         color: color,
-        metalness: 0.3,
-        roughness: 0.6,
+        metalness: 0.2,
+        roughness: 0.7,
         emissive: color,
-        emissiveIntensity: 0.2,
+        emissiveIntensity: 0.1,
+        transparent: true,
+        opacity: 0.3, // More transparent to distinguish from assembled cubes
       });
 
       const mesh = new THREE.Mesh(geometry, material);
@@ -57,11 +59,11 @@ export function createComponentVisualizations(
       const worldZ = (voxel.z - 5) * cellSize;
       mesh.position.set(worldX, worldY, worldZ);
       
-      // Add edge wireframe for clarity
+      // Add edge wireframe for clarity (brighter for blueprint)
       const edges = new THREE.EdgesGeometry(geometry);
       const line = new THREE.LineSegments(
         edges,
-        new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.2 })
+        new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.6 })
       );
       mesh.add(line);
 
