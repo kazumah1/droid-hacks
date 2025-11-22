@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { Slot, updateAvailableSlots } from './slots';
 
-export type BotState = 'free' | 'movingToSlot' | 'attached';
+export type BotState = 'free' | 'movingToSlot' | 'attached' | 'parking';
 
 export class Bot {
   id: number;
@@ -12,6 +12,7 @@ export class Bot {
   position: THREE.Vector3;
   state: BotState = 'free';
   targetSlotId: number | null = null;
+  parkingTarget: THREE.Vector3 | null = null;
 
   constructor(id: number, mesh: THREE.Group, initialPos: THREE.Vector3) {
     this.id = id;
@@ -47,9 +48,17 @@ export class SwarmController {
   bots: Bot[];
   slots: Slot[] = [];
   speed = 3; // units/sec
+  private forward = new THREE.Vector3(1, 0, 0);
+  private tmpDir = new THREE.Vector3();
+  private tmpQuat = new THREE.Quaternion();
+  private hubCenter: THREE.Vector3;
+  private hubRadius: number;
 
-  constructor(bots: Bot[]) {
+  constructor(bots: Bot[], hubCenter = new THREE.Vector3(-8, 0.3, 0), hubRadius = 2) {
     this.bots = bots;
+    this.hubCenter = hubCenter.clone();
+    this.hubRadius = hubRadius;
+    this.scatter();
   }
 
   setSlots(slots: Slot[]) {
@@ -67,23 +76,21 @@ export class SwarmController {
     this.bots.forEach(bot => {
       bot.state = 'free';
       bot.targetSlotId = null;
+      bot.parkingTarget = null;
       bot.setColorFree();
     });
+
+    const n = Math.min(slots.length, this.bots.length);
+    for (let i = n; i < this.bots.length; i++) {
+      this.parkBot(this.bots[i]);
+    }
   }
 
   scatter() {
     // Clear structure and scatter bots randomly
     this.slots = [];
     this.bots.forEach(bot => {
-      bot.state = 'free';
-      bot.targetSlotId = null;
-      bot.position.set(
-        (Math.random() - 0.5) * 6,
-        0.3 + Math.random() * 0.5,
-        (Math.random() - 0.5) * 6
-      );
-      bot.mesh.position.copy(bot.position);
-      bot.setColorFree();
+      this.parkBot(bot, true);
     });
   }
 
@@ -119,6 +126,7 @@ export class SwarmController {
       }
       
       if (best) {
+        bot.parkingTarget = null;
         bot.targetSlotId = best.id;
         bot.state = 'movingToSlot';
         targeted.add(best.id); // Mark as targeted to prevent double-assignment
@@ -132,17 +140,23 @@ export class SwarmController {
 
     // Step 2: Move bots toward their targets
     for (const bot of this.bots) {
+      if (bot.state === 'parking') {
+        this.updateParking(bot, dt);
+        continue;
+      }
+
       if (bot.state !== 'movingToSlot' || bot.targetSlotId === null) continue;
       const slot = this.slots[bot.targetSlotId];
       if (!slot) continue;
 
-      const dir = slot.position.clone().sub(bot.position);
+      const dir = this.tmpDir.copy(slot.position).sub(bot.position);
       const dist = dir.length();
       
       if (dist < 0.05) {
         // Arrived - attach to slot
         bot.position.copy(slot.position);
         bot.mesh.position.copy(bot.position);
+        this.alignMesh(bot, slot, dist, dir);
         bot.state = 'attached';
         bot.targetSlotId = null;
         slot.state = 'filled';
@@ -158,10 +172,58 @@ export class SwarmController {
         const step = this.speed * speedFactor * dt;
         bot.position.addScaledVector(dir, step);
         bot.mesh.position.copy(bot.position);
-        
-        // Add rotation for visual feedback while moving
-        bot.mesh.rotation.y += 2 * dt;
+        this.alignMesh(bot, slot, dist, dir);
       }
+    }
+  }
+
+  private alignMesh(bot: Bot, slot: Slot | null, dist: number, dir: THREE.Vector3) {
+    const hasDir = dir.lengthSq() > 1e-6;
+    if (hasDir) {
+      this.tmpQuat.setFromUnitVectors(this.forward, dir.clone().normalize());
+      bot.mesh.quaternion.slerp(this.tmpQuat, 0.2);
+    }
+
+    if (slot && dist < 0.15) {
+      bot.mesh.quaternion.slerp(slot.orientation, 0.35);
+    }
+  }
+
+  private updateParking(bot: Bot, dt: number) {
+    if (!bot.parkingTarget) {
+      bot.parkingTarget = this.randomHubPoint();
+    }
+    const dir = this.tmpDir.copy(bot.parkingTarget).sub(bot.position);
+    const dist = dir.length();
+    if (dist < 0.05) {
+      bot.position.copy(bot.parkingTarget);
+      bot.mesh.position.copy(bot.position);
+      bot.parkingTarget = null;
+      return;
+    }
+    dir.normalize();
+    const step = this.speed * 0.8 * dt;
+    bot.position.addScaledVector(dir, step);
+    bot.mesh.position.copy(bot.position);
+    this.alignMesh(bot, null, dist, dir);
+  }
+
+  private randomHubPoint() {
+    return new THREE.Vector3(
+      this.hubCenter.x + (Math.random() - 0.5) * 2 * this.hubRadius,
+      this.hubCenter.y + Math.random() * 0.3,
+      this.hubCenter.z + (Math.random() - 0.5) * 2 * this.hubRadius
+    );
+  }
+
+  private parkBot(bot: Bot, snap = false) {
+    bot.state = 'parking';
+    bot.targetSlotId = null;
+    bot.parkingTarget = this.randomHubPoint();
+    bot.setColorFree();
+    if (snap) {
+      bot.position.copy(bot.parkingTarget);
+      bot.mesh.position.copy(bot.position);
     }
   }
 }
