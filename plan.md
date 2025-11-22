@@ -10,6 +10,16 @@ I’ll annotate which person touches which file.
 
 ---
 
+## Builder progress — 2025-11-22
+
+- Three.js scene now stands on its own: `app/page.tsx` spins up the renderer, lights, fog, grid, floor plane, and 150 microbots without relying on Brain/Architect hooks.
+- UI buttons (`Build Pyramid`, `Build Wall`, custom input, `Scatter`) directly call into the swarm controller so the rendering demo works end-to-end even before the other modules are wired up.
+- Added cinematic polish (dual point lights, ambient fill, grid helper, camera damping) plus a default pyramid build trigger so the view never feels empty.
+- Teammate-specific helpers and window globals were stripped out; this document now tracks how the Builder layer behaves so the other roles can integrate against a clean surface later.
+- Integrated Architect teammate’s logic: commands now flow through `gravitySortVoxels` → `buildSlotsFromVoxels`, and the UI can toggle between the centralized `SwarmController` and the new `AutonomousSwarmSystem` to compare behaviors.
+
+---
+
 ## Project file structure
 
 ```txt
