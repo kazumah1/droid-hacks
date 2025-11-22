@@ -106,6 +106,8 @@ export default function Page() {
   const [mode, setMode] = useState<'centralized' | 'autonomous'>('centralized');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [lastAssemblyPlan, setLastAssemblyPlan] = useState<AssemblyPlan | null>(null);
+  const [inputValue, setInputValue] = useState<string>('');
+  const [showSettings, setShowSettings] = useState<boolean>(false);
 
   const handleBuild = useCallback(
     (command: string) => {
@@ -222,8 +224,8 @@ export default function Page() {
 
     // Scene setup
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050514);
-    scene.fog = new THREE.FogExp2(0x050514, 0.045);
+    scene.background = new THREE.Color(0x000000);
+    scene.fog = new THREE.FogExp2(0x000000, 0.02);
 
     // Camera setup
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
@@ -237,28 +239,25 @@ export default function Page() {
     controls.update();
 
     // Lighting setup
-    const ambient = new THREE.AmbientLight(0x4f7dff, 0.3);
-    const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.3);
+    const dir = new THREE.DirectionalLight(0xffffff, 1.5);
     dir.position.set(10, 20, 10);
-    const rim = new THREE.PointLight(0xff6b00, 1.2, 35);
-    rim.position.set(-12, 8, -4);
-    const depotGlow = new THREE.PointLight(0x4f7dff, 1.6, 18);
-    depotGlow.position.set(0, 4, 0);
-    scene.add(ambient, dir);
-    scene.add(rim, depotGlow);
+    const rimLight = new THREE.DirectionalLight(0xef4444, 0.6);
+    rimLight.position.set(-10, 5, -10);
+    scene.add(ambient, dir, rimLight);
 
     // Floor
     const floorGeom = new THREE.PlaneGeometry(40, 40);
     const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x050516,
-      roughness: 0.9,
-      metalness: 0.1,
+      color: 0x0a0a0a,
+      roughness: 0.8,
+      metalness: 0.2,
     });
     const floor = new THREE.Mesh(floorGeom, floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = false;
     scene.add(floor);
-    const grid = new THREE.GridHelper(40, 20, 0x1e3a8a, 0x111122);
+    const grid = new THREE.GridHelper(40, 20, 0xef4444, 0x1a1a1a);
     grid.position.y = 0.01;
     scene.add(grid);
 
@@ -356,136 +355,147 @@ export default function Page() {
     setStatus(`${MODE_LABEL[mode]} ready. Choose a build command.`);
   }, [mode, setStatus]);
 
+  const handleSubmit = useCallback(() => {
+    if (!inputValue.trim()) return;
+    
+    if (isGenerating) return;
+
+    // Always pass through Claude for AI assembly generation
+    handleGenerateAssembly(inputValue);
+    
+    setInputValue('');
+  }, [inputValue, isGenerating, handleGenerateAssembly]);
+
   return (
-    <main className="h-screen w-screen flex bg-black text-white overflow-hidden">
+    <main className="h-screen w-screen relative overflow-hidden bg-black">
       {/* Three.js canvas container */}
-      <div ref={containerRef} className="flex-1" />
+      <div ref={containerRef} className="absolute inset-0" />
 
-      {/* UI Panel */}
-      <aside className="w-80 p-4 bg-black/70 backdrop-blur border-l border-white/10 flex flex-col gap-4 overflow-y-auto">
-        <div>
-          <h1 className="text-lg font-semibold">Programmable Matter Swarm</h1>
-          <p className="text-xs text-gray-300 mt-1">
-            Text-driven self-assembly inspired by <i>Big Hero 6</i>.
-          </p>
-        </div>
+      {/* App Title */}
+      <div className="absolute top-8 left-8 z-10">
+        <h1 className="text-2xl font-semibold text-white tracking-tight">Microbots</h1>
+        <p className="text-sm text-gray-500 mt-1">AI-Powered Swarm Assembly</p>
+      </div>
 
-        <div className="flex flex-col gap-2">
-          <label className="text-xs uppercase tracking-wide text-gray-400">
-            Mode
-          </label>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setMode('centralized')}
-              className={`px-3 py-2 rounded text-xs font-semibold transition-colors ${
-                mode === 'centralized'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-black/40 text-gray-400 border border-white/10'
-              }`}
-            >
-              Central Controller
-            </button>
-            <button
-              onClick={() => setMode('autonomous')}
-              className={`px-3 py-2 rounded text-xs font-semibold transition-colors ${
-                mode === 'autonomous'
-                  ? 'bg-emerald-500 text-white'
-                  : 'bg-black/40 text-gray-400 border border-white/10'
-              }`}
-            >
-              Autonomous Swarm
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <button
-            onClick={() => handleBuild('pyramid 3')}
-            className="px-3 py-2 bg-blue-500 hover:bg-blue-600 rounded text-sm font-medium transition-colors"
+      {/* Settings Button & Panel */}
+      <div className="absolute top-8 right-8 z-10">
+        <button
+          onClick={() => setShowSettings(!showSettings)}
+          className="w-10 h-10 glass-panel flex items-center justify-center hover:border-red-500 transition-all"
+          aria-label="Settings"
+        >
+          <svg
+            className="w-5 h-5 text-gray-400"
+            fill="none"
+            strokeWidth="2"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            Build Pyramid
-          </button>
-          <button
-            onClick={() => handleBuild('wall 10x4')}
-            className="px-3 py-2 bg-blue-500 hover:bg-blue-600 rounded text-sm font-medium transition-colors"
-          >
-            Build Wall
-          </button>
-          <button
-            onClick={handleScatter}
-            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm font-medium transition-colors"
-          >
-            Scatter
-          </button>
-        </div>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75"
+            />
+          </svg>
+        </button>
 
-        <div className="border-t border-white/10 pt-4">
-          <label className="text-xs uppercase tracking-wide text-gray-400 block mb-2">
-            🤖 Claude AI Assembly
-          </label>
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={() => {
-                const input = document.getElementById('commandInput') as HTMLInputElement;
-                handleGenerateAssembly(input?.value || 'pyramid 6');
-              }}
-              disabled={isGenerating}
-              className="px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed rounded text-sm font-medium transition-colors"
-            >
-              {isGenerating ? 'Generating...' : '✨ Generate Assembly JSON'}
-            </button>
-            <div className="flex gap-2">
+        {/* Settings Panel */}
+        {showSettings && (
+          <div className="absolute top-14 right-0 w-72 glass-panel p-4">
+            <h2 className="text-sm font-semibold text-white mb-4">Control Panel</h2>
+            
+            {/* Mode Selection */}
+            <div className="mb-4">
+              <label className="text-xs text-gray-500 mb-2 block">Mode</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setMode('centralized')}
+                  className={`flex-1 px-3 py-2 text-xs font-medium transition-all ${
+                    mode === 'centralized'
+                      ? 'bg-red-500 text-white'
+                      : 'bg-gray-900 text-gray-400 hover:bg-gray-800'
+                  }`}
+                >
+                  Central
+                </button>
+                <button
+                  onClick={() => setMode('autonomous')}
+                  className={`flex-1 px-3 py-2 text-xs font-medium transition-all ${
+                    mode === 'autonomous'
+                      ? 'bg-red-500 text-white'
+                      : 'bg-gray-900 text-gray-400 hover:bg-gray-800'
+                  }`}
+                >
+                  Autonomous
+                </button>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="space-y-2 mb-4">
               <button
-                onClick={handleDownloadLastPlan}
-                disabled={!lastAssemblyPlan}
-                className="flex-1 px-2 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
+                onClick={handleScatter}
+                className="w-full px-3 py-2 bg-gray-900 hover:bg-gray-800 text-gray-300 text-sm transition-all border border-gray-800"
               >
-                💾 Download JSON
+                Scatter Bots
               </button>
-              <button
-                onClick={handleShowInstructions}
-                disabled={!lastAssemblyPlan}
-                className="flex-1 px-2 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
-              >
-                📋 Instructions
-              </button>
+              
+              {lastAssemblyPlan && (
+                <>
+                  <button
+                    onClick={handleDownloadLastPlan}
+                    className="w-full px-3 py-2 bg-gray-900 hover:bg-gray-800 text-gray-300 text-sm transition-all border border-gray-800"
+                  >
+                    Download Plan
+                  </button>
+                  <button
+                    onClick={handleShowInstructions}
+                    className="w-full px-3 py-2 bg-gray-900 hover:bg-gray-800 text-gray-300 text-sm transition-all border border-gray-800"
+                  >
+                    Show Instructions
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Status */}
+            <div className="pt-3 border-t border-gray-800">
+              <p className="text-xs text-gray-500">
+                {status}
+              </p>
             </div>
           </div>
-        </div>
+        )}
+      </div>
 
-        <div className="mt-4">
-          <label className="text-xs text-gray-400 block mb-1">Custom Command</label>
-          <div className="flex gap-2">
-            <input
-              id="commandInput"
-              type="text"
-              className="flex-1 px-2 py-1 text-xs bg-black/50 border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-              placeholder='e.g. "pyramid 3"'
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const input = e.currentTarget;
-                  handleBuild(input.value || 'pyramid 3');
-                }
-              }}
-            />
-            <button
-              onClick={() => {
-                const input = document.getElementById('commandInput') as HTMLInputElement;
-                handleBuild(input?.value || 'pyramid 3');
-              }}
-              className="px-2 py-1 text-xs bg-emerald-500 hover:bg-emerald-600 rounded font-medium transition-colors"
-            >
-              Go
-            </button>
-          </div>
+      {/* Floating Input Bar */}
+      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-full max-w-2xl px-6 z-10">
+        <div className="glass-panel p-3 flex items-center gap-3">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleSubmit();
+              }
+            }}
+            placeholder="Describe structure (e.g., pyramid 6, bridge, tower)..."
+            className="flex-1 px-3 py-2 bg-transparent text-white placeholder-gray-600 focus:outline-none text-sm"
+            disabled={isGenerating}
+          />
+          <button
+            onClick={handleSubmit}
+            disabled={!inputValue.trim() || isGenerating}
+            className="px-6 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm font-medium transition-all"
+          >
+            {isGenerating ? 'Generating...' : 'Generate'}
+          </button>
         </div>
-
-        <div className="mt-auto pt-4 border-t border-white/10">
-          <div className="text-xs text-gray-400">
-            Status: <span className="text-gray-100 font-medium">{status}</span>
-          </div>
-        </div>
-      </aside>
+        <p className="text-center text-xs text-gray-600 mt-2">
+          Press Enter to generate
+        </p>
+      </div>
     </main>
   );
 }
