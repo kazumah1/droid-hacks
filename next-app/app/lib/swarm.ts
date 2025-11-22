@@ -35,6 +35,14 @@ export class Bot {
           m.roughness = 0.4;
         }
       }
+      // Reduce edge opacity for cleaner assembled look
+      if ((obj as any).isLineSegments) {
+        const line = obj as THREE.LineSegments;
+        const lineMat = line.material as THREE.LineBasicMaterial;
+        if (lineMat) {
+          lineMat.opacity = 0.05;
+        }
+      }
     });
   }
   
@@ -59,7 +67,7 @@ export class Bot {
 export class SwarmController {
   bots: Bot[];
   slots: Slot[] = [];
-  speed = 3; // units/sec
+  speed = 5; // units/sec (faster assembly)
   private forward = new THREE.Vector3(1, 0, 0);
   private tmpDir = new THREE.Vector3();
   private tmpQuat = new THREE.Quaternion();
@@ -164,11 +172,11 @@ export class SwarmController {
       const dir = this.tmpDir.copy(slot.position).sub(bot.position);
       const dist = dir.length();
       
-      if (dist < 0.05) {
-        // Arrived - attach to slot
+      if (dist < 0.1) {
+        // Arrived - snap to slot position for perfect alignment
         bot.position.copy(slot.position);
         bot.mesh.position.copy(bot.position);
-        this.alignMesh(bot, slot, dist, dir);
+        bot.mesh.quaternion.copy(slot.orientation); // Perfect alignment
         bot.state = 'attached';
         bot.targetSlotId = null;
         slot.state = 'filled';
@@ -180,7 +188,7 @@ export class SwarmController {
         // Move toward slot with speed falloff for smooth arrival
         dir.normalize();
         // Ease out: slower when close for smoother attachment
-        const speedFactor = THREE.MathUtils.clamp(dist / 2, 0.3, 1.5);
+        const speedFactor = THREE.MathUtils.clamp(dist / 2, 0.4, 1.8);
         const step = this.speed * speedFactor * dt;
         bot.position.addScaledVector(dir, step);
         bot.mesh.position.copy(bot.position);
@@ -207,14 +215,14 @@ export class SwarmController {
     }
     const dir = this.tmpDir.copy(bot.parkingTarget).sub(bot.position);
     const dist = dir.length();
-    if (dist < 0.05) {
+    if (dist < 0.1) {
       bot.position.copy(bot.parkingTarget);
       bot.mesh.position.copy(bot.position);
       bot.parkingTarget = null;
       return;
     }
     dir.normalize();
-    const step = this.speed * 0.8 * dt;
+    const step = this.speed * 1.2 * dt; // Faster return to hub
     bot.position.addScaledVector(dir, step);
     bot.mesh.position.copy(bot.position);
     this.alignMesh(bot, null, dist, dir);

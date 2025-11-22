@@ -20,7 +20,7 @@ export class AutonomousBot {
   
   // Autonomous behavior parameters
   searchRadius = 15.0; // How far the bot can "see"
-  speed = 8.0; // Movement speed
+  speed = 12.0; // Movement speed (faster assembly)
   
   // Memory (simple cognitive model)
   lastDecisionTime = -Infinity; // Start with immediate first decision
@@ -61,7 +61,7 @@ export class AutonomousBot {
     if (this.state === 'approaching' && this.claimedSlotId !== null) {
       const slot = slots[this.claimedSlotId];
       const dist = this.position.distanceTo(slot.position);
-      if (dist < 0.05) {
+      if (dist < 0.1) {
         this.lockIntoSlot(slot);
         return;
       }
@@ -112,7 +112,7 @@ export class AutonomousBot {
     const dist = this.position.distanceTo(this.target);
     
     // Arrival check
-    if (dist < 0.05 && this.state !== 'approaching') {
+    if (dist < 0.1 && this.state !== 'approaching') {
       // Arrived at wander target
       this.state = 'idle';
       return;
@@ -150,6 +150,7 @@ export class AutonomousBot {
   private lockIntoSlot(slot: Slot) {
     this.position.copy(slot.position);
     this.mesh.position.copy(this.position);
+    this.mesh.quaternion.copy(slot.orientation); // Perfect alignment
     this.state = 'locked';
     slot.state = 'filled';
     this.claimedSlotId = null;
@@ -233,6 +234,14 @@ export class AutonomousBot {
           child.material.emissiveIntensity = emissiveIntensity;
           child.material.metalness = 0.5;
           child.material.roughness = 0.4;
+        }
+      }
+      // Reduce edge opacity for assembled cubes
+      if ((child as any).isLineSegments && emissiveIntensity < 0.5) {
+        const line = child as THREE.LineSegments;
+        const lineMat = line.material as THREE.LineBasicMaterial;
+        if (lineMat) {
+          lineMat.opacity = 0.05;
         }
       }
     });

@@ -1,7 +1,7 @@
 // lib/microbot.ts
 import * as THREE from 'three';
 
-const CUBE_SIZE = 0.54; // Full voxel size (0.6 * 0.9 to match structure voxels)
+const CUBE_SIZE = 0.6; // Full voxel size - perfectly fills grid cell for adjacent placement
 
 export function createMicrobotMesh(): THREE.Group {
   const group = new THREE.Group();
@@ -18,12 +18,12 @@ export function createMicrobotMesh(): THREE.Group {
   const cube = new THREE.Mesh(cubeGeom, cubeMat);
   group.add(cube);
 
-  // Add edge wireframe for clarity
+  // Add subtle edge wireframe - low opacity to avoid artifacts when adjacent
   const edges = new THREE.EdgesGeometry(cubeGeom);
   const edgeMat = new THREE.LineBasicMaterial({ 
     color: 0xffffff, 
     transparent: true, 
-    opacity: 0.5 
+    opacity: 0.15 
   });
   const edgeLines = new THREE.LineSegments(edges, edgeMat);
   group.add(edgeLines);
