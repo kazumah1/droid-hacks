@@ -36,6 +36,7 @@ export function createComponentVisualizations(
 ): ComponentVisualization[] {
   const colors = generateComponentColors(plan.components.length);
   const visualizations: ComponentVisualization[] = [];
+  const GRID_CENTER = 24.5; // center of 0-49 grid
 
   plan.components.forEach((component, index) => {
     const color = colors[index];
@@ -55,9 +56,9 @@ export function createComponentVisualizations(
       });
 
       const mesh = new THREE.Mesh(geometry, material);
-      const worldX = (voxel.x - 5) * cellSize;
+      const worldX = (voxel.x - GRID_CENTER) * cellSize;
       const worldY = 0.3 + voxel.y * cellSize;
-      const worldZ = (voxel.z - 5) * cellSize;
+      const worldZ = (voxel.z - GRID_CENTER) * cellSize;
       mesh.position.set(worldX, worldY, worldZ);
       
       // Add edge wireframe for blueprint visibility
@@ -255,10 +256,10 @@ export function validateAssemblyPlan(plan: AssemblyPlan): {
     });
   });
 
-  // Check voxel coordinates are within bounds
+  // Check voxel coordinates are within bounds (0-49 grid)
   plan.components.forEach(component => {
     component.voxels.forEach((voxel, index) => {
-      if (voxel.x < 0 || voxel.x > 9 || voxel.y < 0 || voxel.y > 9 || voxel.z < 0 || voxel.z > 9) {
+      if (voxel.x < 0 || voxel.x > 49 || voxel.y < 0 || voxel.y > 49 || voxel.z < 0 || voxel.z > 49) {
         warnings.push(
           `Component "${component.id}" voxel ${index} out of bounds: (${voxel.x}, ${voxel.y}, ${voxel.z})`
         );

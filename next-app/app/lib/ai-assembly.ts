@@ -258,10 +258,12 @@ export function downloadAssemblyPlan(plan: AssemblyPlan, filename?: string): voi
 
 /**
  * Convert AssemblyPlan to flat voxel list for visualization
+ * Returns voxels as-is on the 0-49 grid without scaling
  */
 export function assemblyPlanToVoxels(plan: AssemblyPlan): Voxel[] {
   const allVoxels: Voxel[] = [];
   plan.components.forEach(component => {
+    console.log(`Component "${component.name}": ${component.voxels.length} voxels`);
     allVoxels.push(...component.voxels);
   });
   return ensureGroundedVoxels(scaleVoxelsToPlayableGrid(allVoxels));
@@ -375,43 +377,7 @@ function dedupeVoxels(voxels: Voxel[]): Voxel[] {
   return Array.from(map.values());
 }
 
-function scaleVoxelsToPlayableGrid(voxels: Voxel[]): Voxel[] {
-  if (voxels.length === 0) return voxels;
-  const targetMax = 9;
-
-  const bounds = {
-    minX: Number.POSITIVE_INFINITY,
-    maxX: Number.NEGATIVE_INFINITY,
-    minY: Number.POSITIVE_INFINITY,
-    maxY: Number.NEGATIVE_INFINITY,
-    minZ: Number.POSITIVE_INFINITY,
-    maxZ: Number.NEGATIVE_INFINITY,
-  };
-
-  voxels.forEach(v => {
-    bounds.minX = Math.min(bounds.minX, v.x);
-    bounds.maxX = Math.max(bounds.maxX, v.x);
-    bounds.minY = Math.min(bounds.minY, v.y);
-    bounds.maxY = Math.max(bounds.maxY, v.y);
-    bounds.minZ = Math.min(bounds.minZ, v.z);
-    bounds.maxZ = Math.max(bounds.maxZ, v.z);
-  });
-
-  const spanX = Math.max(1, bounds.maxX - bounds.minX);
-  const spanY = Math.max(1, bounds.maxY - bounds.minY);
-  const spanZ = Math.max(1, bounds.maxZ - bounds.minZ);
-
-  return voxels.map(v => ({
-    x: clampToGrid(((v.x - bounds.minX) / spanX) * targetMax),
-    y: clampToGrid(((v.y - bounds.minY) / spanY) * targetMax),
-    z: clampToGrid(((v.z - bounds.minZ) / spanZ) * targetMax),
-  }));
-}
-
-function clampToGrid(value: number): number {
-  const targetMax = 9;
-  return Math.max(0, Math.min(targetMax, Math.round(value)));
-}
+// Removed: scaleVoxelsToPlayableGrid - structures now use full 0-49 grid
 
 function ensureGroundedVoxels(voxels: Voxel[]): Voxel[] {
   const set = new Set(voxels.map(v => `${v.x},${v.y},${v.z}`));

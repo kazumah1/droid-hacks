@@ -2,9 +2,9 @@
   "name": "Tower Structure",
   "description": "A tall tower with a wide base, narrow shaft, and observation deck",
   "gridSize": {
-    "x": 10,
-    "y": 10,
-    "z": 10
+    "x": 49,
+    "y": 49,
+    "z": 49
   },
   "totalVoxels": 37,
   "components": [
@@ -13,22 +13,22 @@
       "name": "Foundation Base",
       "description": "Wide stable foundation (4x4 platform)",
       "voxels": [
-        {"x": 3, "y": 0, "z": 3},
-        {"x": 4, "y": 0, "z": 3},
-        {"x": 5, "y": 0, "z": 3},
-        {"x": 6, "y": 0, "z": 3},
-        {"x": 3, "y": 0, "z": 4},
-        {"x": 4, "y": 0, "z": 4},
-        {"x": 5, "y": 0, "z": 4},
-        {"x": 6, "y": 0, "z": 4},
-        {"x": 3, "y": 0, "z": 5},
-        {"x": 4, "y": 0, "z": 5},
-        {"x": 5, "y": 0, "z": 5},
-        {"x": 6, "y": 0, "z": 5},
-        {"x": 3, "y": 0, "z": 6},
-        {"x": 4, "y": 0, "z": 6},
-        {"x": 5, "y": 0, "z": 6},
-        {"x": 6, "y": 0, "z": 6}
+        {"x": 23, "y": 0, "z": 23},
+        {"x": 24, "y": 0, "z": 23},
+        {"x": 25, "y": 0, "z": 23},
+        {"x": 26, "y": 0, "z": 23},
+        {"x": 23, "y": 0, "z": 24},
+        {"x": 24, "y": 0, "z": 24},
+        {"x": 25, "y": 0, "z": 24},
+        {"x": 26, "y": 0, "z": 24},
+        {"x": 23, "y": 0, "z": 25},
+        {"x": 24, "y": 0, "z": 25},
+        {"x": 25, "y": 0, "z": 25},
+        {"x": 26, "y": 0, "z": 25},
+        {"x": 23, "y": 0, "z": 26},
+        {"x": 24, "y": 0, "z": 26},
+        {"x": 25, "y": 0, "z": 26},
+        {"x": 26, "y": 0, "z": 26}
       ],
       "dependencies": [],
       "assemblyOrder": 1
@@ -38,15 +38,15 @@
       "name": "Transition Layer",
       "description": "Transitional layer from wide base to narrow shaft (3x3)",
       "voxels": [
-        {"x": 3, "y": 1, "z": 3},
-        {"x": 4, "y": 1, "z": 3},
-        {"x": 5, "y": 1, "z": 3},
-        {"x": 3, "y": 1, "z": 4},
-        {"x": 4, "y": 1, "z": 4},
-        {"x": 5, "y": 1, "z": 4},
-        {"x": 3, "y": 1, "z": 5},
-        {"x": 4, "y": 1, "z": 5},
-        {"x": 5, "y": 1, "z": 5}
+        {"x": 23, "y": 1, "z": 23},
+        {"x": 24, "y": 1, "z": 23},
+        {"x": 25, "y": 1, "z": 23},
+        {"x": 23, "y": 1, "z": 24},
+        {"x": 24, "y": 1, "z": 24},
+        {"x": 25, "y": 1, "z": 24},
+        {"x": 23, "y": 1, "z": 25},
+        {"x": 24, "y": 1, "z": 25},
+        {"x": 25, "y": 1, "z": 25}
       ],
       "dependencies": ["foundation"],
       "assemblyOrder": 2
@@ -56,10 +56,10 @@
       "name": "Tower Shaft - Lower",
       "description": "Lower section of vertical shaft (2x2 cross)",
       "voxels": [
-        {"x": 4, "y": 2, "z": 4},
-        {"x": 5, "y": 2, "z": 4},
-        {"x": 4, "y": 3, "z": 4},
-        {"x": 5, "y": 3, "z": 4}
+        {"x": 24, "y": 2, "z": 24},
+        {"x": 25, "y": 2, "z": 24},
+        {"x": 24, "y": 3, "z": 24},
+        {"x": 25, "y": 3, "z": 24}
       ],
       "dependencies": ["transition_layer"],
       "assemblyOrder": 3
@@ -69,10 +69,10 @@
       "name": "Tower Shaft - Upper",
       "description": "Upper section of vertical shaft continuing upward",
       "voxels": [
-        {"x": 4, "y": 4, "z": 4},
-        {"x": 5, "y": 4, "z": 4},
-        {"x": 4, "y": 5, "z": 4},
-        {"x": 5, "y": 5, "z": 4}
+        {"x": 24, "y": 4, "z": 24},
+        {"x": 25, "y": 4, "z": 24},
+        {"x": 24, "y": 5, "z": 24},
+        {"x": 25, "y": 5, "z": 24}
       ],
       "dependencies": ["shaft_lower"],
       "assemblyOrder": 4
@@ -82,15 +82,15 @@
       "name": "Observation Deck",
       "description": "Top platform for observation (3x3 deck)",
       "voxels": [
-        {"x": 3, "y": 6, "z": 3},
-        {"x": 4, "y": 6, "z": 3},
-        {"x": 5, "y": 6, "z": 3},
-        {"x": 3, "y": 6, "z": 4},
-        {"x": 4, "y": 6, "z": 4},
-        {"x": 5, "y": 6, "z": 4},
-        {"x": 3, "y": 6, "z": 5},
-        {"x": 4, "y": 6, "z": 5},
-        {"x": 5, "y": 6, "z": 5}
+        {"x": 23, "y": 6, "z": 23},
+        {"x": 24, "y": 6, "z": 23},
+        {"x": 25, "y": 6, "z": 23},
+        {"x": 23, "y": 6, "z": 24},
+        {"x": 24, "y": 6, "z": 24},
+        {"x": 25, "y": 6, "z": 24},
+        {"x": 23, "y": 6, "z": 25},
+        {"x": 24, "y": 6, "z": 25},
+        {"x": 25, "y": 6, "z": 25}
       ],
       "dependencies": ["shaft_upper"],
       "assemblyOrder": 5
@@ -100,7 +100,7 @@
       "name": "Spire",
       "description": "Decorative top spire",
       "voxels": [
-        {"x": 4, "y": 7, "z": 4}
+        {"x": 24, "y": 7, "z": 24}
       ],
       "dependencies": ["observation_deck"],
       "assemblyOrder": 6
