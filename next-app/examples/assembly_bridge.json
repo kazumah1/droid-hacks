@@ -1,0 +1,117 @@
+{
+  "name": "Bridge Structure",
+  "description": "A simple bridge with two support towers and a connecting deck",
+  "gridSize": {
+    "x": 10,
+    "y": 10,
+    "z": 10
+  },
+  "totalVoxels": 30,
+  "components": [
+    {
+      "id": "left_foundation",
+      "name": "Left Support Foundation",
+      "description": "Foundation for the left bridge support (2x2 base)",
+      "voxels": [
+        {"x": 1, "y": 0, "z": 4},
+        {"x": 2, "y": 0, "z": 4},
+        {"x": 1, "y": 0, "z": 5},
+        {"x": 2, "y": 0, "z": 5}
+      ],
+      "dependencies": [],
+      "assemblyOrder": 1
+    },
+    {
+      "id": "right_foundation",
+      "name": "Right Support Foundation",
+      "description": "Foundation for the right bridge support (2x2 base)",
+      "voxels": [
+        {"x": 7, "y": 0, "z": 4},
+        {"x": 8, "y": 0, "z": 4},
+        {"x": 7, "y": 0, "z": 5},
+        {"x": 8, "y": 0, "z": 5}
+      ],
+      "dependencies": [],
+      "assemblyOrder": 1
+    },
+    {
+      "id": "left_tower",
+      "name": "Left Support Tower",
+      "description": "Vertical tower on the left side (3 blocks tall)",
+      "voxels": [
+        {"x": 1, "y": 1, "z": 4},
+        {"x": 1, "y": 2, "z": 4},
+        {"x": 1, "y": 3, "z": 4}
+      ],
+      "dependencies": ["left_foundation"],
+      "assemblyOrder": 2
+    },
+    {
+      "id": "right_tower",
+      "name": "Right Support Tower",
+      "description": "Vertical tower on the right side (3 blocks tall)",
+      "voxels": [
+        {"x": 8, "y": 1, "z": 4},
+        {"x": 8, "y": 2, "z": 4},
+        {"x": 8, "y": 3, "z": 4}
+      ],
+      "dependencies": ["right_foundation"],
+      "assemblyOrder": 2
+    },
+    {
+      "id": "left_tower_cap",
+      "name": "Left Tower Cap",
+      "description": "Top platform of left tower (2x2)",
+      "voxels": [
+        {"x": 1, "y": 4, "z": 4},
+        {"x": 2, "y": 4, "z": 4},
+        {"x": 1, "y": 4, "z": 5},
+        {"x": 2, "y": 4, "z": 5}
+      ],
+      "dependencies": ["left_tower"],
+      "assemblyOrder": 3
+    },
+    {
+      "id": "right_tower_cap",
+      "name": "Right Tower Cap",
+      "description": "Top platform of right tower (2x2)",
+      "voxels": [
+        {"x": 7, "y": 4, "z": 4},
+        {"x": 8, "y": 4, "z": 4},
+        {"x": 7, "y": 4, "z": 5},
+        {"x": 8, "y": 4, "z": 5}
+      ],
+      "dependencies": ["right_tower"],
+      "assemblyOrder": 3
+    },
+    {
+      "id": "bridge_deck",
+      "name": "Bridge Deck",
+      "description": "Horizontal deck connecting the two towers",
+      "voxels": [
+        {"x": 3, "y": 4, "z": 4},
+        {"x": 4, "y": 4, "z": 4},
+        {"x": 5, "y": 4, "z": 4},
+        {"x": 6, "y": 4, "z": 4}
+      ],
+      "dependencies": ["left_tower_cap", "right_tower_cap"],
+      "assemblyOrder": 4
+    },
+    {
+      "id": "deck_railings",
+      "name": "Deck Railings",
+      "description": "Safety railings along the bridge deck",
+      "voxels": [
+        {"x": 3, "y": 5, "z": 4},
+        {"x": 4, "y": 5, "z": 4},
+        {"x": 5, "y": 5, "z": 4},
+        {"x": 6, "y": 5, "z": 4}
+      ],
+      "dependencies": ["bridge_deck"],
+      "assemblyOrder": 5
+    }
+  ],
+  "buildStrategy": "Build both support towers simultaneously from their foundations, add tower caps, connect with horizontal deck, and finish with safety railings",
+  "estimatedTime": "~50 seconds"
+}
+
