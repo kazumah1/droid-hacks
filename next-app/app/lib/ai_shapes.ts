@@ -1,18 +1,39 @@
 // lib/ai_shapes.ts
+import Anthropic from '@anthropic-ai/sdk';
 import type { Vector3 } from './types';
 
 const CELL_SIZE = 0.6;
+const SYSTEM_PROMPT = `You are a shape generator for a programmable matter simulator.
+
+The world is a 3D voxel grid with x, y, z coordinates ranging from 0 to 9 (inclusive).
+Given a short natural language command (like "pyramid 4" or "wall 6x3"),
+you must respond with a JSON object ONLY, with this shape:
+
+{
+  "voxels": [
+    {"x": 0, "y": 0, "z": 0},
+    ...
+  ]
+}
+
+Rules:
+- voxels must form a single connected structure.
+- do not exceed a 10x10x10 grid (0–9).
+- y=0 is the ground.
+- For a pyramid N, produce a stepped pyramid with N levels.
+- For a wall W x H, produce a vertical wall with width and height.
+- Never include any extra keys or commentary, only the JSON object.`;
 
 export async function generateShapeFromText(prompt: string): Promise<Vector3[]> {
   // 1. Simple keyword-based fallback without LLM
   const lower = prompt.toLowerCase();
-  if (!process.env.NEXT_PUBLIC_OPENAI_API_KEY) {
+  if (!process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY) {
     if (lower.includes('wall')) return generateFallbackWall();
     return generateFallbackPyramid();
   }
 
   try {
-    const coords = await callOpenAIForVoxels(prompt);
+    const coords = await callAnthropicForVoxels(prompt);
     if (!coords || !Array.isArray(coords) || coords.length === 0) {
       return lower.includes('wall') ? generateFallbackWall() : generateFallbackPyramid();
     }
@@ -35,43 +56,50 @@ interface RawCoord {
 }
 
 // Very simple raw OpenAI call
-async function callOpenAIForVoxels(prompt: string): Promise<RawCoord[]> {
-  const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY!;
-  const systemPrompt = `
-You are a shape planner for a programmable matter swarm. 
-Given a user command, output a JSON array of integer coordinates in a 10x10x10 grid, like:
-[{ "x": 0, "y": 0, "z": 0 }, ...]
-Do NOT include any extra text, only raw JSON.
-Prefer grounded structures (start y=0) and avoid floating blocks.
-`;
+async function callAnthropicForVoxels(prompt: string): Promise<RawCoord[]> {
+    try {
+        const apiKey = process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY;
+        if (!apiKey) {
+        console.error('Missing ANTHROPIC_API_KEY');
+        return [];
+        }
+        
+        const client = new Anthropic({
+        apiKey,
+        dangerouslyAllowBrowser: true, // Required for client-side usage
+        });
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini', // or whatever is available at the hackathon
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.2,
-      max_tokens: 512,
-    }),
-  });
+        const message = await client.messages.create({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 1024,
+        messages: [
+            { role: 'user', content: `${SYSTEM_PROMPT}\n\nUser command: ${prompt}` },
+        ],
+        });
 
-  if (!res.ok) {
-    throw new Error(`OpenAI error: ${res.status}`);
-  }
-  const data = await res.json();
-  const raw = data.choices?.[0]?.message?.content?.trim() ?? '[]';
+        const text = message.content[0].type === 'text' ? message.content[0].text : '';
+        
+        // Try to parse JSON from the response
+        const jsonStart = text.indexOf('{');
+        const jsonEnd = text.lastIndexOf('}');
+        if (jsonStart === -1 || jsonEnd === -1) return [];
+        const json = JSON.parse(text.slice(jsonStart, jsonEnd + 1));
+        const voxels = (json.voxels || []) as Vector3[];
 
-  // Extract JSON (in case it wraps it in ```json ...)
-  const jsonStr = raw.replace(/```json/g, '').replace(/```/g, '');
-  const parsed = JSON.parse(jsonStr);
-  return parsed as RawCoord[];
+        // sanitize / clamp
+        return voxels
+        .filter(v => v && typeof v.x === 'number' && typeof v.y === 'number' && typeof v.z === 'number')
+        .map(v => ({
+            x: Math.max(0, Math.min(9, Math.round(v.x))),
+            y: Math.max(0, Math.min(9, Math.round(v.y))),
+            z: Math.max(0, Math.min(9, Math.round(v.z))),
+        }));
+    } catch (e) {
+        console.error('AI shape error', e);
+        return [];
+    }
+
+
 }
 
 /**
