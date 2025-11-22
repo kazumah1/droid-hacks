@@ -41,7 +41,13 @@ export class AutonomousBot {
    * Autonomous decision making - bot decides what to do based on environment
    * This is called each frame, but bot only makes decisions periodically
    */
-  think(slots: Slot[], otherBots: AutonomousBot[], currentTime: number) {
+  think(
+    slots: Slot[],
+    otherBots: AutonomousBot[],
+    currentTime: number,
+    hubCenter?: THREE.Vector3,
+    hubRadius?: number
+  ) {
     // Don't think too often (cognitive throttling)
     if (currentTime - this.lastDecisionTime < this.decisionInterval) {
       return;
@@ -64,8 +70,7 @@ export class AutonomousBot {
     // Stigmergic search: Look for available slots within sensor range
     const availableSlots = slots.filter(s => s.state === 'available');
     if (availableSlots.length === 0) {
-      // No slots available at all - idle and wait
-      this.idle();
+      this.moveToHub(hubCenter, hubRadius);
       return;
     }
 
@@ -94,12 +99,7 @@ export class AutonomousBot {
     if (nearestSlot) {
       this.claimSlot(nearestSlot);
     } else {
-      // No slots in range - wander randomly (foraging behavior)
-      // Always wander if not already moving toward something
-      if (this.state === 'idle' || this.state === 'searching' || 
-          this.position.distanceTo(this.target) < 0.5) {
-        this.wander();
-      }
+      this.moveToHub(hubCenter, hubRadius);
     }
   }
 
@@ -186,6 +186,21 @@ export class AutonomousBot {
     this.state = 'searching';
   }
 
+  private moveToHub(hubCenter?: THREE.Vector3, hubRadius = 2) {
+    if (!hubCenter) {
+      this.wander();
+      return;
+    }
+    const angle = Math.random() * Math.PI * 2;
+    const radius = Math.random() * hubRadius;
+    this.target.set(
+      hubCenter.x + Math.cos(angle) * radius,
+      hubCenter.y + Math.random() * 0.2,
+      hubCenter.z + Math.sin(angle) * radius
+    );
+    this.state = 'searching';
+  }
+
   /**
    * Reset bot to free state
    */
@@ -229,9 +244,14 @@ export class AutonomousSwarmSystem {
   bots: AutonomousBot[];
   slots: Slot[] = [];
   currentTime = 0;
+  private hubCenter: THREE.Vector3;
+  private hubRadius: number;
 
-  constructor(bots: AutonomousBot[]) {
+  constructor(bots: AutonomousBot[], hubCenter = new THREE.Vector3(8, 0.3, 0), hubRadius = 2) {
     this.bots = bots;
+    this.hubCenter = hubCenter.clone();
+    this.hubRadius = hubRadius;
+    this.scatter();
   }
 
   /**
@@ -258,11 +278,8 @@ export class AutonomousSwarmSystem {
   scatter() {
     this.slots = [];
     this.bots.forEach(bot => {
-      bot.position.set(
-        (Math.random() - 0.5) * 10,
-        0.3 + Math.random() * 0.5,
-        (Math.random() - 0.5) * 10
-      );
+      const pos = this.randomHubPoint();
+      bot.position.copy(pos);
       bot.mesh.position.copy(bot.position);
       bot.reset();
     });
@@ -276,7 +293,7 @@ export class AutonomousSwarmSystem {
 
     // Phase 1: Each bot makes autonomous decisions (thinking)
     for (const bot of this.bots) {
-      bot.think(this.slots, this.bots, this.currentTime);
+      bot.think(this.slots, this.bots, this.currentTime, this.hubCenter, this.hubRadius);
     }
 
     // Phase 2: Each bot executes movement (acting)
@@ -291,6 +308,16 @@ export class AutonomousSwarmSystem {
     // Phase 3: Update environment (stigmergic signaling)
     // When slots are filled, dependent slots become available
     updateAvailableSlots(this.slots);
+  }
+
+  private randomHubPoint() {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = Math.random() * this.hubRadius;
+    return new THREE.Vector3(
+      this.hubCenter.x + Math.cos(angle) * radius,
+      this.hubCenter.y + Math.random() * 0.2,
+      this.hubCenter.z + Math.sin(angle) * radius
+    );
   }
 
   /**

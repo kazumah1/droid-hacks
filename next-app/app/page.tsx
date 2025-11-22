@@ -15,6 +15,21 @@ import { AutonomousBot, AutonomousSwarmSystem } from '@/app/lib/autonomous-swarm
 const CELL_SIZE = 0.6;
 const FILL_DENSITY = 3;
 const GRID_CENTER = 4.5;
+const HUB_RADIUS = 2.5;
+const HUBS = {
+  centralized: new THREE.Vector3(-9, 0.3, 0),
+  autonomous: new THREE.Vector3(9, 0.3, 0),
+};
+
+function randomHubPosition(center: THREE.Vector3, radius = HUB_RADIUS) {
+  const angle = Math.random() * Math.PI * 2;
+  const r = Math.random() * radius;
+  return new THREE.Vector3(
+    center.x + Math.cos(angle) * r,
+    center.y + Math.random() * 0.2,
+    center.z + Math.sin(angle) * r
+  );
+}
 const MODE_LABEL: Record<'centralized' | 'autonomous', string> = {
   centralized: 'Central Controller',
   autonomous: 'Autonomous Swarm',
@@ -115,7 +130,7 @@ export default function Page() {
   const handleScatter = useCallback(() => {
     const activeMode = modeRef.current;
     const label = MODE_LABEL[activeMode];
-    setStatus(`Scattering ${label.toLowerCase()}...`);
+    setStatus(`Returning ${label.toLowerCase()} to hub...`);
 
     if (activeMode === 'centralized') {
       swarmRef.current?.scatter();
@@ -186,25 +201,18 @@ export default function Page() {
     const autonomousBots: AutonomousBot[] = [];
     const centralMeshes: THREE.Group[] = [];
     const autonomousMeshes: THREE.Group[] = [];
-    const numBots = 800;
-
-    const randomDepotPosition = () =>
-      new THREE.Vector3(
-        (Math.random() - 0.5) * 6,
-        0.3 + Math.random() * 0.5,
-        (Math.random() - 0.5) * 6
-      );
+    const numBots = 500;
 
     for (let i = 0; i < numBots; i++) {
       const meshCentral = createMicrobotMesh();
-      meshCentral.position.copy(randomDepotPosition());
+      meshCentral.position.copy(randomHubPosition(HUBS.centralized));
       meshCentral.visible = modeRef.current === 'centralized';
       scene.add(meshCentral);
       centralBots.push(new Bot(i, meshCentral, meshCentral.position));
       centralMeshes.push(meshCentral);
 
       const meshAutonomous = createMicrobotMesh();
-      meshAutonomous.position.copy(randomDepotPosition());
+      meshAutonomous.position.copy(randomHubPosition(HUBS.autonomous));
       meshAutonomous.visible = modeRef.current === 'autonomous';
       scene.add(meshAutonomous);
       autonomousBots.push(new AutonomousBot(i, meshAutonomous));
@@ -214,9 +222,9 @@ export default function Page() {
     centralMeshesRef.current = centralMeshes;
     autonomousMeshesRef.current = autonomousMeshes;
 
-    const swarm = new SwarmController(centralBots);
+    const swarm = new SwarmController(centralBots, HUBS.centralized, HUB_RADIUS);
     swarmRef.current = swarm;
-    const autonomousSwarm = new AutonomousSwarmSystem(autonomousBots);
+    const autonomousSwarm = new AutonomousSwarmSystem(autonomousBots, HUBS.autonomous, HUB_RADIUS);
     autonomousRef.current = autonomousSwarm;
 
     // Animation loop
