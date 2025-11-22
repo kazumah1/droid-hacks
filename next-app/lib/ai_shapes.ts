@@ -54,7 +54,7 @@ export async function generateShapeFromText(command: string): Promise<Voxel[]> {
     });
 
     const message = await client.messages.create({
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 1024,
       messages: [
         { role: 'user', content: `${SYSTEM_PROMPT}\n\nUser command: ${command}` },
