@@ -42,13 +42,16 @@ export function createComponentVisualizations(
     const meshes: THREE.Mesh[] = [];
 
     component.voxels.forEach(voxel => {
-      const geometry = new THREE.BoxGeometry(cellSize * 0.9, cellSize * 0.9, cellSize * 0.9);
+      // Match exact cube size for perfect alignment with assembled cubes
+      const geometry = new THREE.BoxGeometry(cellSize, cellSize, cellSize);
       const material = new THREE.MeshStandardMaterial({
         color: color,
-        metalness: 0.3,
-        roughness: 0.6,
+        metalness: 0.2,
+        roughness: 0.7,
         emissive: color,
-        emissiveIntensity: 0.2,
+        emissiveIntensity: 0.1,
+        transparent: true,
+        opacity: 0.2, // Very transparent to show as blueprint guide only
       });
 
       const mesh = new THREE.Mesh(geometry, material);
@@ -57,11 +60,11 @@ export function createComponentVisualizations(
       const worldZ = (voxel.z - 5) * cellSize;
       mesh.position.set(worldX, worldY, worldZ);
       
-      // Add edge wireframe for clarity
+      // Add edge wireframe for blueprint visibility
       const edges = new THREE.EdgesGeometry(geometry);
       const line = new THREE.LineSegments(
         edges,
-        new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.2 })
+        new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.4 })
       );
       mesh.add(line);
 

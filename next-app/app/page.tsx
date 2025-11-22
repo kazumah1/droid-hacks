@@ -18,6 +18,11 @@ import {
   generateAssemblyInstructions,
   type AssemblyPlan,
 } from '@/app/lib/ai-assembly';
+import {
+  createComponentVisualizations,
+  toggleComponentVisibility,
+  type ComponentVisualization,
+} from '@/app/lib/component-visualizer';
 
 const CELL_SIZE = 0.6;
 const FILL_DENSITY = 1;
@@ -95,12 +100,14 @@ function buildWallVoxels(width = 10, height = 4): Voxel[] {
 
 export default function Page() {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
   const swarmRef = useRef<SwarmController | null>(null);
   const autonomousRef = useRef<AutonomousSwarmSystem | null>(null);
   const modeRef = useRef<'centralized' | 'autonomous'>('centralized');
   const centralMeshesRef = useRef<THREE.Group[]>([]);
   const autonomousMeshesRef = useRef<THREE.Group[]>([]);
   const animationRef = useRef<number | null>(null);
+  const componentVisualizationsRef = useRef<ComponentVisualization[]>([]);
 
   const [status, setStatus] = useState<string>('Idle');
   const [mode, setMode] = useState<'centralized' | 'autonomous'>('centralized');
@@ -108,6 +115,7 @@ export default function Page() {
   const [lastAssemblyPlan, setLastAssemblyPlan] = useState<AssemblyPlan | null>(null);
   const [inputValue, setInputValue] = useState<string>('');
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [showStructure, setShowStructure] = useState<boolean>(false);
 
   const handleBuild = useCallback(
     (command: string) => {
@@ -162,6 +170,33 @@ export default function Page() {
       const plan = await generateAssemblyPlan(command || 'pyramid 6');
       setLastAssemblyPlan(plan);
       
+      // Clear previous visualizations
+      componentVisualizationsRef.current.forEach(viz => {
+        viz.meshes.forEach(mesh => {
+          if (sceneRef.current) {
+            sceneRef.current.remove(mesh);
+          }
+          mesh.geometry.dispose();
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach(m => m.dispose());
+          } else {
+            mesh.material.dispose();
+          }
+        });
+      });
+      componentVisualizationsRef.current = [];
+
+      // Create component visualizations
+      if (sceneRef.current) {
+        const visualizations = createComponentVisualizations(plan, sceneRef.current, CELL_SIZE);
+        componentVisualizationsRef.current = visualizations;
+        
+        // Show all components
+        visualizations.forEach(viz => {
+          toggleComponentVisibility(viz, showStructure);
+        });
+      }
+      
       // Convert to voxels and build
       const voxels = assemblyPlanToVoxels(plan);
       const ordered = gravitySortVoxels(voxels);
@@ -180,7 +215,7 @@ export default function Page() {
     } finally {
       setIsGenerating(false);
     }
-  }, [isGenerating, setStatus]);
+  }, [isGenerating, setStatus, showStructure]);
 
   const handleDownloadLastPlan = useCallback(() => {
     if (!lastAssemblyPlan) {
@@ -203,6 +238,65 @@ export default function Page() {
     setStatus('Assembly instructions printed to console');
   }, [lastAssemblyPlan, setStatus]);
 
+  const handleLoadJSON = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const plan = JSON.parse(e.target?.result as string) as AssemblyPlan;
+        setLastAssemblyPlan(plan);
+        
+        // Clear previous visualizations
+        componentVisualizationsRef.current.forEach(viz => {
+          viz.meshes.forEach(mesh => {
+            if (sceneRef.current) {
+              sceneRef.current.remove(mesh);
+            }
+            mesh.geometry.dispose();
+            if (Array.isArray(mesh.material)) {
+              mesh.material.forEach(m => m.dispose());
+            } else {
+              mesh.material.dispose();
+            }
+          });
+        });
+        componentVisualizationsRef.current = [];
+
+        // Create component visualizations
+        if (sceneRef.current) {
+          const visualizations = createComponentVisualizations(plan, sceneRef.current, CELL_SIZE);
+          componentVisualizationsRef.current = visualizations;
+          
+          // Show all components
+          visualizations.forEach(viz => {
+            toggleComponentVisibility(viz, showStructure);
+          });
+        }
+        
+        // Convert to voxels and build
+        const voxels = assemblyPlanToVoxels(plan);
+        const ordered = gravitySortVoxels(voxels);
+        const slots = buildSlotsFromVoxels(ordered, CELL_SIZE);
+
+        swarmRef.current?.setSlots(slots);
+        autonomousRef.current?.setSlots(slots);
+
+        setStatus(
+          `Loaded ${plan.name}: ${plan.components.length} components, ${plan.totalVoxels} voxels`
+        );
+      } catch (error) {
+        console.error('Failed to load JSON:', error);
+        setStatus('Error: Invalid JSON file format');
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset input so the same file can be loaded again
+    event.target.value = '';
+  }, [showStructure, setStatus]);
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -220,6 +314,7 @@ export default function Page() {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x000000);
     scene.fog = new THREE.FogExp2(0x000000, 0.02);
+    sceneRef.current = scene;
 
     // Camera setup
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
@@ -323,6 +418,20 @@ export default function Page() {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
+      
+      // Clean up component visualizations
+      componentVisualizationsRef.current.forEach(viz => {
+        viz.meshes.forEach(mesh => {
+          scene.remove(mesh);
+          mesh.geometry.dispose();
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach(m => m.dispose());
+          } else {
+            mesh.material.dispose();
+          }
+        });
+      });
+      
       renderer.dispose();
       if (containerRef.current?.contains(renderer.domElement)) {
         containerRef.current.removeChild(renderer.domElement);
@@ -348,6 +457,12 @@ export default function Page() {
 
     setStatus(`${MODE_LABEL[mode]} ready. Choose a build command.`);
   }, [mode, setStatus]);
+
+  useEffect(() => {
+    componentVisualizationsRef.current.forEach(viz => {
+      toggleComponentVisibility(viz, showStructure);
+    });
+  }, [showStructure]);
 
   const handleSubmit = useCallback(() => {
     if (!inputValue.trim()) return;
@@ -425,6 +540,21 @@ export default function Page() {
               </div>
             </div>
 
+            {/* Blueprint Visibility Toggle */}
+            <div className="mb-4">
+              <label className="text-xs text-gray-500 mb-2 block">Blueprint</label>
+              <button
+                onClick={() => setShowStructure(!showStructure)}
+                className={`w-full px-3 py-2 text-sm font-medium transition-all ${
+                  showStructure
+                    ? 'bg-red-500 text-white'
+                    : 'bg-gray-900 text-gray-400 hover:bg-gray-800'
+                }`}
+              >
+                {showStructure ? 'Hide Blueprint' : 'Show Blueprint'}
+              </button>
+            </div>
+
             {/* Actions */}
             <div className="space-y-2 mb-4">
               <button
@@ -433,6 +563,16 @@ export default function Page() {
               >
                 Scatter Bots
               </button>
+              
+              <label className="w-full px-3 py-2 bg-gray-900 hover:bg-gray-800 text-gray-300 text-sm transition-all border border-gray-800 cursor-pointer flex items-center justify-center">
+                Load JSON File
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleLoadJSON}
+                  className="hidden"
+                />
+              </label>
               
               {lastAssemblyPlan && (
                 <>

@@ -20,7 +20,7 @@ export class AutonomousBot {
   
   // Autonomous behavior parameters
   searchRadius = 15.0; // How far the bot can "see"
-  speed = 8.0; // Movement speed
+  speed = 12.0; // Movement speed (faster assembly)
   
   // Memory (simple cognitive model)
   lastDecisionTime = -Infinity; // Start with immediate first decision
@@ -61,7 +61,7 @@ export class AutonomousBot {
     if (this.state === 'approaching' && this.claimedSlotId !== null) {
       const slot = slots[this.claimedSlotId];
       const dist = this.position.distanceTo(slot.position);
-      if (dist < 0.05) {
+      if (dist < 0.1) {
         this.lockIntoSlot(slot);
         return;
       }
@@ -112,7 +112,7 @@ export class AutonomousBot {
     const dist = this.position.distanceTo(this.target);
     
     // Arrival check
-    if (dist < 0.05 && this.state !== 'approaching') {
+    if (dist < 0.1 && this.state !== 'approaching') {
       // Arrived at wander target
       this.state = 'idle';
       return;
@@ -141,7 +141,7 @@ export class AutonomousBot {
     this.claimedSlotId = slot.id;
     this.target.copy(slot.position);
     this.state = 'approaching';
-    this.setBotColor(0x4f7dff); // Blue - active
+    this.setBotColor(0x3b82f6, 0.6); // Blue - active
   }
 
   /**
@@ -150,10 +150,11 @@ export class AutonomousBot {
   private lockIntoSlot(slot: Slot) {
     this.position.copy(slot.position);
     this.mesh.position.copy(this.position);
+    this.mesh.quaternion.copy(slot.orientation); // Perfect alignment
     this.state = 'locked';
     slot.state = 'filled';
     this.claimedSlotId = null;
-    this.setBotColor(0xffaa00); // Orange - locked
+    this.setBotColor(0xf97316, 0.3); // Orange - locked
   }
 
   /**
@@ -208,7 +209,7 @@ export class AutonomousBot {
     this.state = 'idle';
     this.claimedSlotId = null;
     this.target.copy(this.position);
-    this.setBotColor(0x4f7dff);
+    this.setBotColor(0x3b82f6, 0.6);
   }
 
   private alignMesh(slotOrientation?: THREE.Quaternion, dist?: number) {
@@ -224,12 +225,23 @@ export class AutonomousBot {
     this.mesh.quaternion.slerp(this.tmpQuat, 0.2);
   }
 
-  private setBotColor(hex: number) {
+  private setBotColor(hex: number, emissiveIntensity = 0.6) {
     this.mesh.traverse((child: THREE.Object3D) => {
       if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
         if (child.material.emissive) {
+          child.material.color.setHex(hex);
           child.material.emissive.setHex(hex);
-          child.material.emissiveIntensity = 1.5;
+          child.material.emissiveIntensity = emissiveIntensity;
+          child.material.metalness = 0.5;
+          child.material.roughness = 0.4;
+        }
+      }
+      // Reduce edge opacity for assembled cubes
+      if ((child as any).isLineSegments && emissiveIntensity < 0.5) {
+        const line = child as THREE.LineSegments;
+        const lineMat = line.material as THREE.LineBasicMaterial;
+        if (lineMat) {
+          lineMat.opacity = 0.05;
         }
       }
     });
