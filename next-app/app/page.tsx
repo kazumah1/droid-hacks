@@ -11,6 +11,13 @@ import { buildSlotsFromVoxels } from '@/app/lib/slots';
 import { Bot, SwarmController } from '@/app/lib/swarm';
 import { gravitySortVoxels, type Voxel } from '@/app/lib/stigmergy';
 import { AutonomousBot, AutonomousSwarmSystem } from '@/app/lib/autonomous-swarm';
+import {
+  generateAssemblyPlan,
+  downloadAssemblyPlan,
+  assemblyPlanToVoxels,
+  generateAssemblyInstructions,
+  type AssemblyPlan,
+} from '@/app/lib/ai-assembly';
 
 const CELL_SIZE = 0.6;
 const FILL_DENSITY = 3;
@@ -97,6 +104,8 @@ export default function Page() {
 
   const [status, setStatus] = useState<string>('Idle');
   const [mode, setMode] = useState<'centralized' | 'autonomous'>('centralized');
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [lastAssemblyPlan, setLastAssemblyPlan] = useState<AssemblyPlan | null>(null);
 
   const handleBuild = useCallback(
     (command: string) => {
@@ -140,6 +149,63 @@ export default function Page() {
 
     setTimeout(() => setStatus('Idle'), 1200);
   }, [setStatus]);
+
+  const handleGenerateAssembly = useCallback(async (command: string) => {
+    if (isGenerating) return;
+    
+    setIsGenerating(true);
+    setStatus('Generating component-based assembly plan with Claude...');
+
+    try {
+      const plan = await generateAssemblyPlan(command || 'pyramid 6');
+      setLastAssemblyPlan(plan);
+      
+      // Convert to voxels and build
+      const voxels = assemblyPlanToVoxels(plan);
+      const ordered = gravitySortVoxels(voxels);
+      const slots = buildSlotsFromVoxels(ordered, CELL_SIZE);
+
+      const activeMode = modeRef.current;
+      swarmRef.current?.setSlots(slots);
+      autonomousRef.current?.setSlots(slots);
+
+      setStatus(
+        `Generated ${plan.name}: ${plan.components.length} components, ${plan.totalVoxels} voxels`
+      );
+
+      // Auto-download the JSON
+      setTimeout(() => {
+        downloadAssemblyPlan(plan);
+        setStatus(`Assembly plan downloaded! Building ${plan.name}...`);
+      }, 500);
+    } catch (error) {
+      console.error('Failed to generate assembly:', error);
+      setStatus('Error: Failed to generate assembly plan');
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [isGenerating, setStatus]);
+
+  const handleDownloadLastPlan = useCallback(() => {
+    if (!lastAssemblyPlan) {
+      setStatus('No assembly plan to download');
+      return;
+    }
+    downloadAssemblyPlan(lastAssemblyPlan);
+    setStatus('Assembly plan downloaded!');
+  }, [lastAssemblyPlan, setStatus]);
+
+  const handleShowInstructions = useCallback(() => {
+    if (!lastAssemblyPlan) {
+      setStatus('No assembly plan available');
+      return;
+    }
+    const instructions = generateAssemblyInstructions(lastAssemblyPlan);
+    console.log('\n' + '='.repeat(60));
+    console.log(instructions);
+    console.log('='.repeat(60) + '\n');
+    setStatus('Assembly instructions printed to console');
+  }, [lastAssemblyPlan, setStatus]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -351,6 +417,40 @@ export default function Page() {
           >
             Scatter
           </button>
+        </div>
+
+        <div className="border-t border-white/10 pt-4">
+          <label className="text-xs uppercase tracking-wide text-gray-400 block mb-2">
+            🤖 Claude AI Assembly
+          </label>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => {
+                const input = document.getElementById('commandInput') as HTMLInputElement;
+                handleGenerateAssembly(input?.value || 'pyramid 6');
+              }}
+              disabled={isGenerating}
+              className="px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed rounded text-sm font-medium transition-colors"
+            >
+              {isGenerating ? 'Generating...' : '✨ Generate Assembly JSON'}
+            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleDownloadLastPlan}
+                disabled={!lastAssemblyPlan}
+                className="flex-1 px-2 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
+              >
+                💾 Download JSON
+              </button>
+              <button
+                onClick={handleShowInstructions}
+                disabled={!lastAssemblyPlan}
+                className="flex-1 px-2 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors"
+              >
+                📋 Instructions
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="mt-4">
