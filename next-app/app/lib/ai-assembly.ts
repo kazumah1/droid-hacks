@@ -7,11 +7,21 @@ export interface Voxel {
   z: number;
 }
 
+export type ShapePrimitive =
+  | {
+      type: 'box';
+      origin: [number, number, number]; // inclusive
+      size: [number, number, number];   // width (x), height (y), depth (z)
+      shell?: boolean;                  // if true, only outer shell
+      thickness?: number;               // shell thickness (default 1)
+    };
+
 export interface Component {
   id: string;
   name: string;
   description: string;
   voxels: Voxel[];
+  shapes?: ShapePrimitive[];
   dependencies: string[];  // IDs of components that must be built first
   assemblyOrder: number;
 }
@@ -30,8 +40,8 @@ const ASSEMBLY_SYSTEM_PROMPT = `You are an advanced assembly planner for program
 
 Given a natural language command describing a structure, generate a detailed assembly plan as JSON.
 
-The world is a 3D voxel grid with coordinates ranging from 0 to 9 (inclusive).
-- x, y, z are integers (0-9)
+The world is a 3D voxel grid with coordinates ranging from 0 to 49 (inclusive).
+- x, y, z are integers (0-49)
 - y=0 is the ground
 - Structures must be gravity-stable (blocks need support below)
 
@@ -40,17 +50,22 @@ You must respond with ONLY a valid JSON object in this exact format:
 {
   "name": "Structure Name",
   "description": "Brief description of what this structure is",
-  "gridSize": {"x": 10, "y": 10, "z": 10},
+  "gridSize": {"x": 49, "y": 49, "z": 49},
   "totalVoxels": 0,
   "components": [
     {
       "id": "component_1",
       "name": "Component Name",
       "description": "What this component represents",
-      "voxels": [
-        {"x": 0, "y": 0, "z": 0},
-        {"x": 1, "y": 0, "z": 0}
+      "shapes": [
+        {
+          "type": "box",
+          "origin": [0, 0, 0],
+          "size": [4, 2, 3],
+          "shell": false
+        }
       ],
+      "voxels": [], // optional explicit voxels for irregular bits
       "dependencies": [],
       "assemblyOrder": 1
     }
@@ -62,12 +77,14 @@ You must respond with ONLY a valid JSON object in this exact format:
 IMPORTANT RULES:
 1. Break complex structures into logical components (foundation, walls, roof, etc.)
 2. Each component should have meaningful voxels that form part of the structure
-3. Use dependencies to ensure stable construction order
-4. assemblyOrder starts at 1 and increments
-5. Component IDs should be unique and descriptive (e.g., "foundation", "north_wall", "tower_base")
-6. Total voxels should match the sum of all component voxels
-7. All voxels must be within 0-9 range for x, y, z
-8. Do NOT include any text outside the JSON object
+3. Prefer SHAPES over enumerating every voxel. Use box primitives to describe large solids/shells.
+4. Only list explicit voxels for small or irregular details (<= 50 entries).
+5. Use dependencies to ensure stable construction order
+6. assemblyOrder starts at 1 and increments
+7. Component IDs should be unique and descriptive (e.g., "foundation", "north_wall", "tower_base")
+8. Total voxels should match the sum after shapes are expanded (assume solid fill unless shell=true)
+9. All coordinates must be integers 0-49
+10. Do NOT include any text outside the JSON object
 
 Examples of good component breakdowns:
 - Pyramid: base_layer, middle_layers, apex
@@ -82,17 +99,20 @@ export async function generateAssemblyPlan(command: string): Promise<AssemblyPla
   const fallbackPlan: AssemblyPlan = {
     name: 'Simple Pyramid',
     description: 'A 3-level pyramid structure',
-    gridSize: { x: 10, y: 10, z: 10 },
+    gridSize: { x: 49, y: 49, z: 49 },
     totalVoxels: 14,
     components: [
       {
         id: 'base_layer',
         name: 'Base Layer',
         description: 'The foundation base of the pyramid (3x3)',
-        voxels: [
-          { x: 4, y: 0, z: 4 }, { x: 5, y: 0, z: 4 }, { x: 6, y: 0, z: 4 },
-          { x: 4, y: 0, z: 5 }, { x: 5, y: 0, z: 5 }, { x: 6, y: 0, z: 5 },
-          { x: 4, y: 0, z: 6 }, { x: 5, y: 0, z: 6 }, { x: 6, y: 0, z: 6 },
+        voxels: [],
+        shapes: [
+          {
+            type: 'box',
+            origin: [4, 0, 4],
+            size: [3, 1, 3],
+          },
         ],
         dependencies: [],
         assemblyOrder: 1,
@@ -101,9 +121,13 @@ export async function generateAssemblyPlan(command: string): Promise<AssemblyPla
         id: 'middle_layer',
         name: 'Middle Layer',
         description: 'The middle section of the pyramid (2x2)',
-        voxels: [
-          { x: 4, y: 1, z: 4 }, { x: 5, y: 1, z: 4 },
-          { x: 4, y: 1, z: 5 }, { x: 5, y: 1, z: 5 },
+        voxels: [],
+        shapes: [
+          {
+            type: 'box',
+            origin: [4, 1, 4],
+            size: [2, 1, 2],
+          },
         ],
         dependencies: ['base_layer'],
         assemblyOrder: 2,
@@ -136,7 +160,7 @@ export async function generateAssemblyPlan(command: string): Promise<AssemblyPla
     console.log(`Generating assembly plan for: "${command}"`);
 
     const message = await client.messages.create({
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 4096,
       temperature: 0.3,
       messages: [
@@ -147,19 +171,28 @@ export async function generateAssemblyPlan(command: string): Promise<AssemblyPla
       ],
     });
 
-    const text = message.content[0].type === 'text' ? message.content[0].text : '';
-    console.log('Claude response:', text);
+    const fullText = (message.content ?? [])
+      .map((chunk) => (chunk.type === 'text' ? chunk.text : ''))
+      .join('')
+      .trim();
 
-    // Extract JSON from response
-    const jsonStart = text.indexOf('{');
-    const jsonEnd = text.lastIndexOf('}');
+    console.log('Claude response:', fullText);
+
+    const cleaned = sanitizeJsonSnippet(fullText);
+    const jsonStart = cleaned.indexOf('{');
+    const jsonEnd = cleaned.lastIndexOf('}');
     if (jsonStart === -1 || jsonEnd === -1) {
       console.warn('No JSON found in response, using fallback');
       return fallbackPlan;
     }
 
-    const jsonStr = text.slice(jsonStart, jsonEnd + 1);
-    const plan = JSON.parse(jsonStr) as AssemblyPlan;
+    let plan: AssemblyPlan;
+    try {
+      plan = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1)) as AssemblyPlan;
+    } catch (parseErr) {
+      console.error('Failed to parse assembly JSON:', parseErr, cleaned);
+      return fallbackPlan;
+    }
 
     // Validate and sanitize
     if (!plan.components || plan.components.length === 0) {
@@ -168,16 +201,18 @@ export async function generateAssemblyPlan(command: string): Promise<AssemblyPla
     }
 
     // Sanitize all voxels
-    plan.components = plan.components.map(component => ({
-      ...component,
-      voxels: component.voxels
-        .filter(v => v && typeof v.x === 'number' && typeof v.y === 'number' && typeof v.z === 'number')
-        .map(v => ({
-          x: Math.max(0, Math.min(9, Math.round(v.x))),
-          y: Math.max(0, Math.min(9, Math.round(v.y))),
-          z: Math.max(0, Math.min(9, Math.round(v.z))),
-        })),
-    }));
+    plan.components = plan.components.map(component => {
+      const sanitizedShapes = (component.shapes ?? []).map(sanitizeShapePrimitive);
+      const shapeVoxels = sanitizedShapes.flatMap(expandShapePrimitive);
+      const explicitVoxels = sanitizeVoxels(component.voxels ?? []);
+      const mergedVoxels = dedupeVoxels([...explicitVoxels, ...shapeVoxels]);
+
+      return {
+        ...component,
+        shapes: sanitizedShapes,
+        voxels: mergedVoxels,
+      };
+    });
 
     // Calculate total voxels
     plan.totalVoxels = plan.components.reduce(
@@ -192,6 +227,16 @@ export async function generateAssemblyPlan(command: string): Promise<AssemblyPla
     console.error('AI assembly plan error:', e);
     return fallbackPlan;
   }
+}
+
+function sanitizeJsonSnippet(text: string): string {
+  return text
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .replace(/\r\n/g, '\n')
+    // remove trailing commas before closing braces/brackets
+    .replace(/,\s*(?=[}\]])/g, '')
+    .replace(/\u0000/g, ''); // strip null chars if any sneak in
 }
 
 /**
@@ -219,7 +264,7 @@ export function assemblyPlanToVoxels(plan: AssemblyPlan): Voxel[] {
   plan.components.forEach(component => {
     allVoxels.push(...component.voxels);
   });
-  return allVoxels;
+  return scaleVoxelsToPlayableGrid(allVoxels);
 }
 
 /**
@@ -245,5 +290,126 @@ export function generateAssemblyInstructions(plan: AssemblyPlan): string {
     });
 
   return instructions;
+}
+
+function sanitizeVoxels(voxels: Voxel[]): Voxel[] {
+  return voxels
+    .filter(v => v && typeof v.x === 'number' && typeof v.y === 'number' && typeof v.z === 'number')
+    .map(sanitizeVoxel);
+}
+
+function sanitizeVoxel(v: Voxel): Voxel {
+  return {
+    x: clampGridCoord(v.x),
+    y: clampGridCoord(v.y),
+    z: clampGridCoord(v.z),
+  };
+}
+
+function clampGridCoord(n: number): number {
+  return Math.max(0, Math.min(49, Math.round(n)));
+}
+
+function sanitizeShapePrimitive(shape: ShapePrimitive): ShapePrimitive {
+  if (shape.type === 'box') {
+    return {
+      type: 'box',
+      origin: [
+        clampGridCoord(shape.origin[0]),
+        clampGridCoord(shape.origin[1]),
+        clampGridCoord(shape.origin[2]),
+      ],
+      size: [
+        Math.max(1, Math.round(shape.size[0])),
+        Math.max(1, Math.round(shape.size[1])),
+        Math.max(1, Math.round(shape.size[2])),
+      ],
+      shell: Boolean(shape.shell),
+      thickness: shape.thickness ? Math.max(1, Math.round(shape.thickness)) : undefined,
+    };
+  }
+  return shape;
+}
+
+function expandShapePrimitive(shape: ShapePrimitive): Voxel[] {
+  switch (shape.type) {
+    case 'box':
+      return expandBox(shape);
+    default:
+      return [];
+  }
+}
+
+function expandBox(shape: Extract<ShapePrimitive, { type: 'box' }>): Voxel[] {
+  const [ox, oy, oz] = shape.origin;
+  const [w, h, d] = shape.size;
+  const voxels: Voxel[] = [];
+  const thickness = shape.shell ? (shape.thickness ?? 1) : null;
+
+  for (let dx = 0; dx < w; dx++) {
+    for (let dy = 0; dy < h; dy++) {
+      for (let dz = 0; dz < d; dz++) {
+        const voxel = sanitizeVoxel({ x: ox + dx, y: oy + dy, z: oz + dz });
+        if (thickness) {
+          const onBoundary =
+            dx < thickness || dx >= w - thickness ||
+            dy < thickness || dy >= h - thickness ||
+            dz < thickness || dz >= d - thickness;
+          if (!onBoundary) continue;
+        }
+        voxels.push(voxel);
+      }
+    }
+  }
+  return voxels;
+}
+
+function dedupeVoxels(voxels: Voxel[]): Voxel[] {
+  const map = new Map<string, Voxel>();
+  voxels.forEach(v => {
+    const key = `${v.x},${v.y},${v.z}`;
+    if (!map.has(key)) {
+      map.set(key, v);
+    }
+  });
+  return Array.from(map.values());
+}
+
+function scaleVoxelsToPlayableGrid(voxels: Voxel[]): Voxel[] {
+  if (voxels.length === 0) return voxels;
+  const targetMax = 9;
+
+  const bounds = {
+    minX: Number.POSITIVE_INFINITY,
+    maxX: Number.NEGATIVE_INFINITY,
+    minY: Number.POSITIVE_INFINITY,
+    maxY: Number.NEGATIVE_INFINITY,
+    minZ: Number.POSITIVE_INFINITY,
+    maxZ: Number.NEGATIVE_INFINITY,
+  };
+
+  voxels.forEach(v => {
+    bounds.minX = Math.min(bounds.minX, v.x);
+    bounds.maxX = Math.max(bounds.maxX, v.x);
+    bounds.minY = Math.min(bounds.minY, v.y);
+    bounds.maxY = Math.max(bounds.maxY, v.y);
+    bounds.minZ = Math.min(bounds.minZ, v.z);
+    bounds.maxZ = Math.max(bounds.maxZ, v.z);
+  });
+
+  const spanX = Math.max(1, bounds.maxX - bounds.minX);
+  const spanY = Math.max(1, bounds.maxY - bounds.minY);
+  const spanZ = Math.max(1, bounds.maxZ - bounds.minZ);
+
+  return voxels.map(v => ({
+    x: clampToGrid(((v.x - bounds.minX) / spanX) * targetMax),
+    y: clampToGrid(((v.y - bounds.minY) / spanY) * targetMax),
+    z: clampToGrid(((v.z - bounds.minZ) / spanZ) * targetMax),
+  }));
+}
+
+function clampToGrid(value: number): number {
+  const targetMax = 9;
+  return Math.max(0, Math.min(targetMax, Math.round(value)));
 }
 
