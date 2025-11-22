@@ -1,0 +1,112 @@
+{
+  "name": "Tower Structure",
+  "description": "A tall tower with a wide base, narrow shaft, and observation deck",
+  "gridSize": {
+    "x": 10,
+    "y": 10,
+    "z": 10
+  },
+  "totalVoxels": 37,
+  "components": [
+    {
+      "id": "foundation",
+      "name": "Foundation Base",
+      "description": "Wide stable foundation (4x4 platform)",
+      "voxels": [
+        {"x": 3, "y": 0, "z": 3},
+        {"x": 4, "y": 0, "z": 3},
+        {"x": 5, "y": 0, "z": 3},
+        {"x": 6, "y": 0, "z": 3},
+        {"x": 3, "y": 0, "z": 4},
+        {"x": 4, "y": 0, "z": 4},
+        {"x": 5, "y": 0, "z": 4},
+        {"x": 6, "y": 0, "z": 4},
+        {"x": 3, "y": 0, "z": 5},
+        {"x": 4, "y": 0, "z": 5},
+        {"x": 5, "y": 0, "z": 5},
+        {"x": 6, "y": 0, "z": 5},
+        {"x": 3, "y": 0, "z": 6},
+        {"x": 4, "y": 0, "z": 6},
+        {"x": 5, "y": 0, "z": 6},
+        {"x": 6, "y": 0, "z": 6}
+      ],
+      "dependencies": [],
+      "assemblyOrder": 1
+    },
+    {
+      "id": "transition_layer",
+      "name": "Transition Layer",
+      "description": "Transitional layer from wide base to narrow shaft (3x3)",
+      "voxels": [
+        {"x": 3, "y": 1, "z": 3},
+        {"x": 4, "y": 1, "z": 3},
+        {"x": 5, "y": 1, "z": 3},
+        {"x": 3, "y": 1, "z": 4},
+        {"x": 4, "y": 1, "z": 4},
+        {"x": 5, "y": 1, "z": 4},
+        {"x": 3, "y": 1, "z": 5},
+        {"x": 4, "y": 1, "z": 5},
+        {"x": 5, "y": 1, "z": 5}
+      ],
+      "dependencies": ["foundation"],
+      "assemblyOrder": 2
+    },
+    {
+      "id": "shaft_lower",
+      "name": "Tower Shaft - Lower",
+      "description": "Lower section of vertical shaft (2x2 cross)",
+      "voxels": [
+        {"x": 4, "y": 2, "z": 4},
+        {"x": 5, "y": 2, "z": 4},
+        {"x": 4, "y": 3, "z": 4},
+        {"x": 5, "y": 3, "z": 4}
+      ],
+      "dependencies": ["transition_layer"],
+      "assemblyOrder": 3
+    },
+    {
+      "id": "shaft_upper",
+      "name": "Tower Shaft - Upper",
+      "description": "Upper section of vertical shaft continuing upward",
+      "voxels": [
+        {"x": 4, "y": 4, "z": 4},
+        {"x": 5, "y": 4, "z": 4},
+        {"x": 4, "y": 5, "z": 4},
+        {"x": 5, "y": 5, "z": 4}
+      ],
+      "dependencies": ["shaft_lower"],
+      "assemblyOrder": 4
+    },
+    {
+      "id": "observation_deck",
+      "name": "Observation Deck",
+      "description": "Top platform for observation (3x3 deck)",
+      "voxels": [
+        {"x": 3, "y": 6, "z": 3},
+        {"x": 4, "y": 6, "z": 3},
+        {"x": 5, "y": 6, "z": 3},
+        {"x": 3, "y": 6, "z": 4},
+        {"x": 4, "y": 6, "z": 4},
+        {"x": 5, "y": 6, "z": 4},
+        {"x": 3, "y": 6, "z": 5},
+        {"x": 4, "y": 6, "z": 5},
+        {"x": 5, "y": 6, "z": 5}
+      ],
+      "dependencies": ["shaft_upper"],
+      "assemblyOrder": 5
+    },
+    {
+      "id": "spire",
+      "name": "Spire",
+      "description": "Decorative top spire",
+      "voxels": [
+        {"x": 4, "y": 7, "z": 4}
+      ],
+      "dependencies": ["observation_deck"],
+      "assemblyOrder": 6
+    }
+  ],
+  "buildStrategy": "Ground-up construction starting with wide foundation for stability, transitioning to narrow shaft for height, expanding again at the top for observation deck, and finishing with decorative spire",
+  "estimatedTime": "~60 seconds"
+}
+
