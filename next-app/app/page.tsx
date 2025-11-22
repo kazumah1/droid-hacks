@@ -25,7 +25,7 @@ import {
 } from '@/app/lib/component-visualizer';
 
 const CELL_SIZE = 0.6;
-const FILL_DENSITY = 3;
+const FILL_DENSITY = 1;
 const GRID_CENTER = 4.5;
 const HUB_RADIUS = 2.5;
 const HUBS = {
@@ -200,7 +200,7 @@ export default function Page() {
       // Convert to voxels and build
       const voxels = assemblyPlanToVoxels(plan);
       const ordered = gravitySortVoxels(voxels);
-      const slots = buildSlotsFromVoxels(ordered, CELL_SIZE);
+      const slots = buildSlotsFromVoxels(ordered, CELL_SIZE, FILL_DENSITY);
 
       const activeMode = modeRef.current;
       swarmRef.current?.setSlots(slots);
@@ -355,7 +355,7 @@ export default function Page() {
     const autonomousBots: AutonomousBot[] = [];
     const centralMeshes: THREE.Group[] = [];
     const autonomousMeshes: THREE.Group[] = [];
-    const numBots = 500;
+    const numBots = 3000;
 
     for (let i = 0; i < numBots; i++) {
       const meshCentral = createMicrobotMesh();
