@@ -174,12 +174,6 @@ export default function Page() {
       setStatus(
         `Generated ${plan.name}: ${plan.components.length} components, ${plan.totalVoxels} voxels`
       );
-
-      // Auto-download the JSON
-      setTimeout(() => {
-        downloadAssemblyPlan(plan);
-        setStatus(`Assembly plan downloaded! Building ${plan.name}...`);
-      }, 500);
     } catch (error) {
       console.error('Failed to generate assembly:', error);
       setStatus('Error: Failed to generate assembly plan');
