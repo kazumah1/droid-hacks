@@ -264,7 +264,7 @@ export function assemblyPlanToVoxels(plan: AssemblyPlan): Voxel[] {
   plan.components.forEach(component => {
     allVoxels.push(...component.voxels);
   });
-  return scaleVoxelsToPlayableGrid(allVoxels);
+  return ensureGroundedVoxels(scaleVoxelsToPlayableGrid(allVoxels));
 }
 
 /**
@@ -411,5 +411,23 @@ function scaleVoxelsToPlayableGrid(voxels: Voxel[]): Voxel[] {
 function clampToGrid(value: number): number {
   const targetMax = 9;
   return Math.max(0, Math.min(targetMax, Math.round(value)));
+}
+
+function ensureGroundedVoxels(voxels: Voxel[]): Voxel[] {
+  const set = new Set(voxels.map(v => `${v.x},${v.y},${v.z}`));
+  const additions: Voxel[] = [];
+
+  voxels.forEach(voxel => {
+    for (let y = voxel.y - 1; y >= 0; y--) {
+      const key = `${voxel.x},${y},${voxel.z}`;
+      if (set.has(key)) break;
+      const support = { x: voxel.x, y, z: voxel.z };
+      set.add(key);
+      additions.push(support);
+    }
+  });
+
+  if (additions.length === 0) return voxels;
+  return dedupeVoxels([...voxels, ...additions]);
 }
 

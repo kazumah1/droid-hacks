@@ -15,6 +15,8 @@ export class AutonomousBot {
   mesh: THREE.Group;
   position: THREE.Vector3;
   target: THREE.Vector3;
+  baseTarget: THREE.Vector3;
+  baseOrientation: THREE.Quaternion;
   state: BotState = 'idle';
   claimedSlotId: number | null = null;
   
@@ -34,6 +36,8 @@ export class AutonomousBot {
     this.mesh = mesh;
     this.position = mesh.position.clone();
     this.target = mesh.position.clone();
+    this.baseTarget = mesh.position.clone();
+    this.baseOrientation = new THREE.Quaternion();
     this.state = 'idle';
   }
 
@@ -152,6 +156,8 @@ export class AutonomousBot {
     this.mesh.position.copy(this.position);
     this.mesh.quaternion.copy(slot.orientation); // Perfect alignment
     this.state = 'locked';
+    this.baseTarget.copy(slot.position);
+    this.baseOrientation.copy(slot.orientation);
     slot.state = 'filled';
     this.claimedSlotId = null;
     this.setBotColor(0xf97316, 0.3); // Orange - locked
@@ -209,6 +215,8 @@ export class AutonomousBot {
     this.state = 'idle';
     this.claimedSlotId = null;
     this.target.copy(this.position);
+    this.baseTarget.set(0, 0, 0);
+    this.baseOrientation.identity();
     this.setBotColor(0x3b82f6, 0.6);
   }
 
@@ -258,6 +266,11 @@ export class AutonomousSwarmSystem {
   currentTime = 0;
   private hubCenter: THREE.Vector3;
   private hubRadius: number;
+  private tmpVec = new THREE.Vector3();
+  structureOffset = new THREE.Vector3();
+  structureOffsetTarget = new THREE.Vector3();
+  structureRotation = new THREE.Quaternion();
+  structureRotationTarget = new THREE.Quaternion();
 
   constructor(bots: AutonomousBot[], hubCenter = new THREE.Vector3(8, 0.3, 0), hubRadius = 2) {
     this.bots = bots;
@@ -271,6 +284,7 @@ export class AutonomousSwarmSystem {
    */
   setSlots(slots: Slot[]) {
     this.slots = slots;
+    this.resetStructureTransform();
     
     // Check for insufficient bots
     if (slots.length > this.bots.length) {
@@ -289,6 +303,7 @@ export class AutonomousSwarmSystem {
    */
   scatter() {
     this.slots = [];
+    this.resetStructureTransform();
     this.bots.forEach(bot => {
       const pos = this.randomHubPoint();
       bot.position.copy(pos);
@@ -297,11 +312,31 @@ export class AutonomousSwarmSystem {
     });
   }
 
+  resetStructureTransform() {
+    this.structureOffset.set(0, 0, 0);
+    this.structureOffsetTarget.set(0, 0, 0);
+    this.structureRotation.identity();
+    this.structureRotationTarget.identity();
+  }
+
+  translateStructure(dx: number, dy: number, dz: number) {
+    this.tmpVec.set(dx, dy, dz);
+    this.structureOffsetTarget.add(this.tmpVec);
+  }
+
+  rotateStructureY(angleRad: number) {
+    const q = new THREE.Quaternion();
+    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), angleRad);
+    this.structureRotationTarget.premultiply(q);
+  }
+
   /**
    * Update loop - each bot thinks and moves autonomously
    */
   update(dt: number) {
     this.currentTime += dt;
+    this.structureOffset.lerp(this.structureOffsetTarget, 1 - Math.exp(-dt * 3));
+    this.structureRotation.slerp(this.structureRotationTarget, 1 - Math.exp(-dt * 3));
 
     // Phase 1: Each bot makes autonomous decisions (thinking)
     for (const bot of this.bots) {
@@ -315,6 +350,12 @@ export class AutonomousSwarmSystem {
           ? this.slots[bot.claimedSlotId]?.orientation
           : undefined;
       bot.move(dt, slotOrientation);
+    }
+
+    for (const bot of this.bots) {
+      if (bot.state === 'locked') {
+        this.applyStructureTransform(bot);
+      }
     }
 
     // Phase 3: Update environment (stigmergic signaling)
@@ -361,6 +402,15 @@ export class AutonomousSwarmSystem {
       },
       progress: this.slots.length > 0 ? filledSlots / this.slots.length : 0,
     };
+  }
+
+  private applyStructureTransform(bot: AutonomousBot) {
+    this.tmpVec.copy(bot.baseTarget);
+    this.tmpVec.applyQuaternion(this.structureRotation);
+    this.tmpVec.add(this.structureOffset);
+    bot.mesh.position.copy(this.tmpVec);
+    const finalQuat = this.structureRotation.clone().multiply(bot.baseOrientation);
+    bot.mesh.quaternion.copy(finalQuat);
   }
 }
 
