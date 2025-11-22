@@ -47,6 +47,9 @@ export class SwarmController {
   bots: Bot[];
   slots: Slot[] = [];
   speed = 3; // units/sec
+  private forward = new THREE.Vector3(1, 0, 0);
+  private tmpDir = new THREE.Vector3();
+  private tmpQuat = new THREE.Quaternion();
 
   constructor(bots: Bot[]) {
     this.bots = bots;
@@ -136,13 +139,14 @@ export class SwarmController {
       const slot = this.slots[bot.targetSlotId];
       if (!slot) continue;
 
-      const dir = slot.position.clone().sub(bot.position);
+      const dir = this.tmpDir.copy(slot.position).sub(bot.position);
       const dist = dir.length();
       
       if (dist < 0.05) {
         // Arrived - attach to slot
         bot.position.copy(slot.position);
         bot.mesh.position.copy(bot.position);
+        this.alignMesh(bot, slot, 0);
         bot.state = 'attached';
         bot.targetSlotId = null;
         slot.state = 'filled';
@@ -158,10 +162,22 @@ export class SwarmController {
         const step = this.speed * speedFactor * dt;
         bot.position.addScaledVector(dir, step);
         bot.mesh.position.copy(bot.position);
-        
-        // Add rotation for visual feedback while moving
-        bot.mesh.rotation.y += 2 * dt;
+        this.alignMesh(bot, slot, dist);
       }
+    }
+  }
+
+  private alignMesh(bot: Bot, slot: Slot, dist: number) {
+    const dir = this.tmpDir.copy(slot.position).sub(bot.position);
+    if (dir.lengthSq() > 1e-6) {
+      dir.normalize();
+      this.tmpQuat.setFromUnitVectors(this.forward, dir);
+    }
+
+    if (dist < 0.15) {
+      bot.mesh.quaternion.slerp(slot.orientation, 0.35);
+    } else if (dir.lengthSq() > 1e-6) {
+      bot.mesh.quaternion.slerp(this.tmpQuat, 0.2);
     }
   }
 }

@@ -13,6 +13,8 @@ import { gravitySortVoxels, type Voxel } from '@/app/lib/stigmergy';
 import { AutonomousBot, AutonomousSwarmSystem } from '@/app/lib/autonomous-swarm';
 
 const CELL_SIZE = 0.6;
+const FILL_DENSITY = 3;
+const GRID_CENTER = 4.5;
 const MODE_LABEL: Record<'centralized' | 'autonomous', string> = {
   centralized: 'Central Controller',
   autonomous: 'Autonomous Swarm',
@@ -29,14 +31,13 @@ function parseCommand(command: string): { kind: ShapeKind; params: number[] } {
   return { kind: 'pyramid', params: numbers };
 }
 
-function buildPyramidVoxels(levels = 6): Voxel[] {
+function buildPyramidVoxels(levels = 3): Voxel[] {
   const voxels: Voxel[] = [];
-  const clampedLevels = THREE.MathUtils.clamp(levels, 2, 8);
-  const gridCenter = 5;
+  const clampedLevels = THREE.MathUtils.clamp(levels, 2, 5);
 
   for (let level = 0; level < clampedLevels; level++) {
-    const size = clampedLevels - level;
-    const start = gridCenter - Math.floor(size / 2);
+    const size = Math.max(1, (clampedLevels - level) * 2 - 1); // Odd widths: 5 -> 3 -> 1
+    const start = GRID_CENTER - (size - 1) / 2;
 
     for (let i = 0; i < size; i++) {
       for (let j = 0; j < size; j++) {
@@ -90,14 +91,14 @@ export default function Page() {
       const voxels =
         kind === 'wall'
           ? buildWallVoxels(params[0] ?? 10, params[1] ?? 4)
-          : buildPyramidVoxels(params[0] ?? 6);
+          : buildPyramidVoxels(params[0] ?? 3);
       const ordered = gravitySortVoxels(voxels);
-      const slots = buildSlotsFromVoxels(ordered, CELL_SIZE);
+      const slots = buildSlotsFromVoxels(ordered, CELL_SIZE, FILL_DENSITY);
 
       const label =
         kind === 'wall'
           ? `${params[0] ?? 10}×${params[1] ?? 4}`
-          : `${params[0] ?? 6} levels`;
+          : `${params[0] ?? 3} levels`;
 
       const activeMode = modeRef.current;
       setStatus(
@@ -185,7 +186,7 @@ export default function Page() {
     const autonomousBots: AutonomousBot[] = [];
     const centralMeshes: THREE.Group[] = [];
     const autonomousMeshes: THREE.Group[] = [];
-    const numBots = 280;
+    const numBots = 800;
 
     const randomDepotPosition = () =>
       new THREE.Vector3(
@@ -248,7 +249,7 @@ export default function Page() {
     window.addEventListener('resize', handleResize);
 
     // Initial shape for the centralized swarm
-    handleBuild('pyramid 6');
+    handleBuild('pyramid 3');
 
     return () => {
       window.removeEventListener('resize', handleResize);
@@ -325,7 +326,7 @@ export default function Page() {
 
         <div className="flex flex-col gap-2">
           <button
-            onClick={() => handleBuild('pyramid 6')}
+            onClick={() => handleBuild('pyramid 3')}
             className="px-3 py-2 bg-blue-500 hover:bg-blue-600 rounded text-sm font-medium transition-colors"
           >
             Build Pyramid
@@ -351,18 +352,18 @@ export default function Page() {
               id="commandInput"
               type="text"
               className="flex-1 px-2 py-1 text-xs bg-black/50 border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-              placeholder='e.g. "pyramid 6"'
+              placeholder='e.g. "pyramid 3"'
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   const input = e.currentTarget;
-                  handleBuild(input.value || 'pyramid 6');
+                  handleBuild(input.value || 'pyramid 3');
                 }
               }}
             />
             <button
               onClick={() => {
                 const input = document.getElementById('commandInput') as HTMLInputElement;
-                handleBuild(input?.value || 'pyramid 6');
+                handleBuild(input?.value || 'pyramid 3');
               }}
               className="px-2 py-1 text-xs bg-emerald-500 hover:bg-emerald-600 rounded font-medium transition-colors"
             >

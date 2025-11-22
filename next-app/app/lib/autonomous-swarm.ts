@@ -25,6 +25,9 @@ export class AutonomousBot {
   // Memory (simple cognitive model)
   lastDecisionTime = -Infinity; // Start with immediate first decision
   decisionInterval = 0.1; // Make decisions every 100ms
+  private forward = new THREE.Vector3(1, 0, 0);
+  private tmpDir = new THREE.Vector3();
+  private tmpQuat = new THREE.Quaternion();
 
   constructor(id: number, mesh: THREE.Group) {
     this.id = id;
@@ -103,7 +106,7 @@ export class AutonomousBot {
   /**
    * Move the bot (called every frame)
    */
-  move(dt: number) {
+  move(dt: number, slotOrientation?: THREE.Quaternion) {
     if (this.state === 'locked') return;
 
     const dist = this.position.distanceTo(this.target);
@@ -126,10 +129,8 @@ export class AutonomousBot {
       // Sync mesh
       this.mesh.position.copy(this.position);
       
-      // Look at target (directional feedback)
-      if (dist > 0.1) {
-        this.mesh.lookAt(this.target);
-      }
+      // Align with motion or slot orientation near arrival
+      this.alignMesh(slotOrientation, dist);
     }
   }
 
@@ -172,7 +173,7 @@ export class AutonomousBot {
     const angle = Math.random() * Math.PI * 2;
     const distance = 2 + Math.random() * 4;
     
-    this.target.set(
+      this.target.set(
       this.position.x + Math.cos(angle) * distance,
       this.position.y,
       this.position.z + Math.sin(angle) * distance
@@ -193,6 +194,19 @@ export class AutonomousBot {
     this.claimedSlotId = null;
     this.target.copy(this.position);
     this.setBotColor(0x4f7dff);
+  }
+
+  private alignMesh(slotOrientation?: THREE.Quaternion, dist?: number) {
+    if (slotOrientation && dist !== undefined && dist < 0.15) {
+      this.mesh.quaternion.slerp(slotOrientation, 0.35);
+      return;
+    }
+
+    const dir = this.tmpDir.copy(this.target).sub(this.position);
+    if (dir.lengthSq() < 1e-6) return;
+    dir.normalize();
+    this.tmpQuat.setFromUnitVectors(this.forward, dir);
+    this.mesh.quaternion.slerp(this.tmpQuat, 0.2);
   }
 
   private setBotColor(hex: number) {
@@ -267,7 +281,11 @@ export class AutonomousSwarmSystem {
 
     // Phase 2: Each bot executes movement (acting)
     for (const bot of this.bots) {
-      bot.move(dt);
+      const slotOrientation =
+        bot.state === 'approaching' && bot.claimedSlotId !== null
+          ? this.slots[bot.claimedSlotId]?.orientation
+          : undefined;
+      bot.move(dt, slotOrientation);
     }
 
     // Phase 3: Update environment (stigmergic signaling)
