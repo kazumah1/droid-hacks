@@ -67,7 +67,7 @@ export class Bot {
 export class SwarmController {
   bots: Bot[];
   slots: Slot[] = [];
-  speed = 5; // units/sec (faster assembly)
+  speed = 30; // units/sec (MUCH faster assembly)
   private forward = new THREE.Vector3(1, 0, 0);
   private tmpDir = new THREE.Vector3();
   private tmpQuat = new THREE.Quaternion();
@@ -189,7 +189,7 @@ export class SwarmController {
         dir.normalize();
         // Ease out: slower when close for smoother attachment
         const speedFactor = THREE.MathUtils.clamp(dist / 2, 0.4, 1.8);
-        const step = this.speed * speedFactor * dt;
+        const step = Math.min(dist, this.speed * speedFactor * dt);
         bot.position.addScaledVector(dir, step);
         bot.mesh.position.copy(bot.position);
         this.alignMesh(bot, slot, dist, dir);

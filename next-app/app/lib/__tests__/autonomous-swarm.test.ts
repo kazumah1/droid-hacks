@@ -303,7 +303,8 @@ test('Swarm stats report correct state', () => {
   bot1.state = 'locked';
   bot2.state = 'approaching';
   
-  const swarm = new AutonomousSwarmSystem([bot1, bot2]);
+  // Don't auto-scatter so bot states aren't reset
+  const swarm = new AutonomousSwarmSystem([bot1, bot2], new MockVector3(8, 0.3, 0), 2, false);
   const stats = swarm.getStats();
   
   assertEqual(stats.bots.locked, 1);

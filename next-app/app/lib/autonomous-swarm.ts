@@ -20,7 +20,7 @@ export class AutonomousBot {
   
   // Autonomous behavior parameters
   searchRadius = 50.0; // How far the bot can "see" (increased for 0-49 grid)
-  speed = 12.0; // Movement speed (faster assembly)
+  speed = 80.0; // Movement speed (MUCH faster assembly)
   
   // Collision avoidance parameters
   collisionRadius = 0.8; // Minimum safe distance from other bots
@@ -75,7 +75,9 @@ export class AutonomousBot {
     // Stigmergic search: Look for available slots within sensor range
     const availableSlots = slots.filter(s => s.state === 'available');
     if (availableSlots.length === 0) {
-      this.moveToHub(hubCenter, hubRadius);
+      // No slots available - go idle
+      this.state = 'idle';
+      this.claimedSlotId = null;
       return;
     }
 
@@ -86,7 +88,7 @@ export class AutonomousBot {
         .map(b => b.claimedSlotId!)
     );
 
-    // Find nearest unclaimed slot (no search radius limit - bots can see all available slots)
+    // Find nearest unclaimed slot within search radius
     let nearestSlot: Slot | null = null;
     let nearestDist = Infinity;
 
@@ -94,7 +96,8 @@ export class AutonomousBot {
       if (claimedSlotIds.has(slot.id)) continue;
       
       const dist = this.position.distanceTo(slot.position);
-      if (dist < nearestDist) {
+      // Only consider slots within search radius
+      if (dist <= this.searchRadius && dist < nearestDist) {
         nearestDist = dist;
         nearestSlot = slot;
       }
@@ -388,11 +391,13 @@ export class AutonomousSwarmSystem {
   private hubCenter: THREE.Vector3;
   private hubRadius: number;
 
-  constructor(bots: AutonomousBot[], hubCenter = new THREE.Vector3(8, 0.3, 0), hubRadius = 2) {
+  constructor(bots: AutonomousBot[], hubCenter = new THREE.Vector3(8, 0.3, 0), hubRadius = 2, autoScatter = true) {
     this.bots = bots;
     this.hubCenter = hubCenter.clone();
     this.hubRadius = hubRadius;
-    this.scatter();
+    if (autoScatter) {
+      this.scatter();
+    }
   }
 
   /**

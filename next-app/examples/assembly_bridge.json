@@ -2,21 +2,21 @@
   "name": "Bridge Structure",
   "description": "A simple bridge with two support towers and a connecting deck",
   "gridSize": {
-    "x": 10,
-    "y": 10,
-    "z": 10
+    "x": 49,
+    "y": 49,
+    "z": 49
   },
-  "totalVoxels": 30,
+  "totalVoxels": 54,
   "components": [
     {
       "id": "left_foundation",
       "name": "Left Support Foundation",
       "description": "Foundation for the left bridge support (2x2 base)",
       "voxels": [
-        {"x": 1, "y": 0, "z": 4},
-        {"x": 2, "y": 0, "z": 4},
-        {"x": 1, "y": 0, "z": 5},
-        {"x": 2, "y": 0, "z": 5}
+        {"x": 15, "y": 0, "z": 24},
+        {"x": 16, "y": 0, "z": 24},
+        {"x": 15, "y": 0, "z": 25},
+        {"x": 16, "y": 0, "z": 25}
       ],
       "dependencies": [],
       "assemblyOrder": 1
@@ -26,10 +26,10 @@
       "name": "Right Support Foundation",
       "description": "Foundation for the right bridge support (2x2 base)",
       "voxels": [
-        {"x": 7, "y": 0, "z": 4},
-        {"x": 8, "y": 0, "z": 4},
-        {"x": 7, "y": 0, "z": 5},
-        {"x": 8, "y": 0, "z": 5}
+        {"x": 33, "y": 0, "z": 24},
+        {"x": 34, "y": 0, "z": 24},
+        {"x": 33, "y": 0, "z": 25},
+        {"x": 34, "y": 0, "z": 25}
       ],
       "dependencies": [],
       "assemblyOrder": 1
@@ -39,9 +39,9 @@
       "name": "Left Support Tower",
       "description": "Vertical tower on the left side (3 blocks tall)",
       "voxels": [
-        {"x": 1, "y": 1, "z": 4},
-        {"x": 1, "y": 2, "z": 4},
-        {"x": 1, "y": 3, "z": 4}
+        {"x": 15, "y": 1, "z": 24},
+        {"x": 15, "y": 2, "z": 24},
+        {"x": 15, "y": 3, "z": 24}
       ],
       "dependencies": ["left_foundation"],
       "assemblyOrder": 2
@@ -51,9 +51,9 @@
       "name": "Right Support Tower",
       "description": "Vertical tower on the right side (3 blocks tall)",
       "voxels": [
-        {"x": 8, "y": 1, "z": 4},
-        {"x": 8, "y": 2, "z": 4},
-        {"x": 8, "y": 3, "z": 4}
+        {"x": 34, "y": 1, "z": 24},
+        {"x": 34, "y": 2, "z": 24},
+        {"x": 34, "y": 3, "z": 24}
       ],
       "dependencies": ["right_foundation"],
       "assemblyOrder": 2
@@ -63,10 +63,10 @@
       "name": "Left Tower Cap",
       "description": "Top platform of left tower (2x2)",
       "voxels": [
-        {"x": 1, "y": 4, "z": 4},
-        {"x": 2, "y": 4, "z": 4},
-        {"x": 1, "y": 4, "z": 5},
-        {"x": 2, "y": 4, "z": 5}
+        {"x": 15, "y": 4, "z": 24},
+        {"x": 16, "y": 4, "z": 24},
+        {"x": 15, "y": 4, "z": 25},
+        {"x": 16, "y": 4, "z": 25}
       ],
       "dependencies": ["left_tower"],
       "assemblyOrder": 3
@@ -76,10 +76,10 @@
       "name": "Right Tower Cap",
       "description": "Top platform of right tower (2x2)",
       "voxels": [
-        {"x": 7, "y": 4, "z": 4},
-        {"x": 8, "y": 4, "z": 4},
-        {"x": 7, "y": 4, "z": 5},
-        {"x": 8, "y": 4, "z": 5}
+        {"x": 33, "y": 4, "z": 24},
+        {"x": 34, "y": 4, "z": 24},
+        {"x": 33, "y": 4, "z": 25},
+        {"x": 34, "y": 4, "z": 25}
       ],
       "dependencies": ["right_tower"],
       "assemblyOrder": 3
@@ -89,10 +89,22 @@
       "name": "Bridge Deck",
       "description": "Horizontal deck connecting the two towers",
       "voxels": [
-        {"x": 3, "y": 4, "z": 4},
-        {"x": 4, "y": 4, "z": 4},
-        {"x": 5, "y": 4, "z": 4},
-        {"x": 6, "y": 4, "z": 4}
+        {"x": 17, "y": 4, "z": 24},
+        {"x": 18, "y": 4, "z": 24},
+        {"x": 19, "y": 4, "z": 24},
+        {"x": 20, "y": 4, "z": 24},
+        {"x": 21, "y": 4, "z": 24},
+        {"x": 22, "y": 4, "z": 24},
+        {"x": 23, "y": 4, "z": 24},
+        {"x": 24, "y": 4, "z": 24},
+        {"x": 25, "y": 4, "z": 24},
+        {"x": 26, "y": 4, "z": 24},
+        {"x": 27, "y": 4, "z": 24},
+        {"x": 28, "y": 4, "z": 24},
+        {"x": 29, "y": 4, "z": 24},
+        {"x": 30, "y": 4, "z": 24},
+        {"x": 31, "y": 4, "z": 24},
+        {"x": 32, "y": 4, "z": 24}
       ],
       "dependencies": ["left_tower_cap", "right_tower_cap"],
       "assemblyOrder": 4
@@ -102,10 +114,22 @@
       "name": "Deck Railings",
       "description": "Safety railings along the bridge deck",
       "voxels": [
-        {"x": 3, "y": 5, "z": 4},
-        {"x": 4, "y": 5, "z": 4},
-        {"x": 5, "y": 5, "z": 4},
-        {"x": 6, "y": 5, "z": 4}
+        {"x": 17, "y": 5, "z": 24},
+        {"x": 18, "y": 5, "z": 24},
+        {"x": 19, "y": 5, "z": 24},
+        {"x": 20, "y": 5, "z": 24},
+        {"x": 21, "y": 5, "z": 24},
+        {"x": 22, "y": 5, "z": 24},
+        {"x": 23, "y": 5, "z": 24},
+        {"x": 24, "y": 5, "z": 24},
+        {"x": 25, "y": 5, "z": 24},
+        {"x": 26, "y": 5, "z": 24},
+        {"x": 27, "y": 5, "z": 24},
+        {"x": 28, "y": 5, "z": 24},
+        {"x": 29, "y": 5, "z": 24},
+        {"x": 30, "y": 5, "z": 24},
+        {"x": 31, "y": 5, "z": 24},
+        {"x": 32, "y": 5, "z": 24}
       ],
       "dependencies": ["bridge_deck"],
       "assemblyOrder": 5

@@ -12,6 +12,10 @@ import { Bot, SwarmController } from '@/app/lib/swarm';
 import { gravitySortVoxels, type Voxel } from '@/app/lib/stigmergy';
 import { AutonomousBot, AutonomousSwarmSystem } from '@/app/lib/autonomous-swarm';
 import {
+  TextConditionedRLAgent,
+  TextConditionedRLController,
+} from '@/app/lib/text-conditioned-rl-agent';
+import {
   generateAssemblyPlan,
   downloadAssemblyPlan,
   assemblyPlanToVoxels,
@@ -31,6 +35,7 @@ const HUB_RADIUS = 2.5;
 const HUBS = {
   centralized: new THREE.Vector3(-9, 0.3, 0),
   autonomous: new THREE.Vector3(9, 0.3, 0),
+  rl: new THREE.Vector3(0, 0.3, 0),
 };
 
 function randomHubPosition(center: THREE.Vector3, radius = HUB_RADIUS) {
@@ -42,9 +47,10 @@ function randomHubPosition(center: THREE.Vector3, radius = HUB_RADIUS) {
     center.z + Math.sin(angle) * r
   );
 }
-const MODE_LABEL: Record<'centralized' | 'autonomous', string> = {
+const MODE_LABEL: Record<'centralized' | 'autonomous' | 'rl', string> = {
   centralized: 'Central Controller',
   autonomous: 'Autonomous Swarm',
+  rl: 'RL Agents',
 };
 
 type ShapeKind = 'pyramid' | 'wall';
@@ -103,14 +109,18 @@ export default function Page() {
   const sceneRef = useRef<THREE.Scene | null>(null);
   const swarmRef = useRef<SwarmController | null>(null);
   const autonomousRef = useRef<AutonomousSwarmSystem | null>(null);
-  const modeRef = useRef<'centralized' | 'autonomous'>('centralized');
+  const rlRef = useRef<TextConditionedRLController | null>(null);
+  const modeRef = useRef<'centralized' | 'autonomous' | 'rl'>('centralized');
   const centralMeshesRef = useRef<THREE.Group[]>([]);
   const autonomousMeshesRef = useRef<THREE.Group[]>([]);
+  const rlMeshesRef = useRef<THREE.Group[]>([]);
   const animationRef = useRef<number | null>(null);
   const componentVisualizationsRef = useRef<ComponentVisualization[]>([]);
 
   const [status, setStatus] = useState<string>('Idle');
-  const [mode, setMode] = useState<'centralized' | 'autonomous'>('centralized');
+  const [mode, setMode] = useState<'centralized' | 'autonomous' | 'rl'>('centralized');
+  const [rlModelLoaded, setRlModelLoaded] = useState<boolean>(false);
+  const [rlMatchScore, setRlMatchScore] = useState<number>(0);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [lastAssemblyPlan, setLastAssemblyPlan] = useState<AssemblyPlan | null>(null);
   const [inputValue, setInputValue] = useState<string>('');
@@ -153,8 +163,10 @@ export default function Page() {
 
     if (activeMode === 'centralized') {
       swarmRef.current?.scatter();
-    } else {
+    } else if (activeMode === 'autonomous') {
       autonomousRef.current?.scatter();
+    } else {
+      rlRef.current?.reset();
     }
 
     setTimeout(() => setStatus('Idle'), 1200);
@@ -208,6 +220,12 @@ export default function Page() {
       const activeMode = modeRef.current;
       swarmRef.current?.setSlots(slots);
       autonomousRef.current?.setSlots(slots);
+      
+      // For RL mode, set target from voxels
+      if (activeMode === 'rl' && rlRef.current) {
+        rlRef.current.setTargetFromVoxels(voxels, command || 'pyramid 6');
+        rlRef.current.reset();
+      }
 
       setStatus(
         `Generated ${plan.name}: ${plan.components.length} components, ${plan.totalVoxels} voxels → ${slots.length} slots`
@@ -285,6 +303,12 @@ export default function Page() {
 
         swarmRef.current?.setSlots(slots);
         autonomousRef.current?.setSlots(slots);
+        
+        // For RL mode, set target from voxels
+        if (modeRef.current === 'rl' && rlRef.current) {
+          rlRef.current.setTargetFromVoxels(voxels, plan.name || 'loaded structure');
+          rlRef.current.reset();
+        }
 
         setStatus(
           `Loaded ${plan.name}: ${plan.components.length} components, ${plan.totalVoxels} voxels`
@@ -353,12 +377,15 @@ export default function Page() {
     grid.position.y = 0.01;
     scene.add(grid);
 
-    // Create two swarms (centralized + autonomous) with their own meshes
+    // Create three swarms (centralized + autonomous + RL) with their own meshes
     const centralBots: Bot[] = [];
     const autonomousBots: AutonomousBot[] = [];
+    const rlAgents: TextConditionedRLAgent[] = [];
     const centralMeshes: THREE.Group[] = [];
     const autonomousMeshes: THREE.Group[] = [];
-    const numBots = 3000;
+    const rlMeshes: THREE.Group[] = [];
+    const numBots = 8000;
+    const numRLAgents = 200; // Increased for better coverage
 
     for (let i = 0; i < numBots; i++) {
       const meshCentral = createMicrobotMesh();
@@ -376,13 +403,43 @@ export default function Page() {
       autonomousMeshes.push(meshAutonomous);
     }
 
+    // Create RL agents
+    for (let i = 0; i < numRLAgents; i++) {
+      const meshRL = createMicrobotMesh();
+      meshRL.position.copy(randomHubPosition(HUBS.rl));
+      meshRL.visible = modeRef.current === 'rl';
+      scene.add(meshRL);
+      const agent = new TextConditionedRLAgent(i, meshRL, 8); // 8x8x8 grid
+      rlAgents.push(agent);
+      rlMeshes.push(meshRL);
+    }
+
     centralMeshesRef.current = centralMeshes;
     autonomousMeshesRef.current = autonomousMeshes;
+    rlMeshesRef.current = rlMeshes;
 
     const swarm = new SwarmController(centralBots, HUBS.centralized, HUB_RADIUS);
     swarmRef.current = swarm;
     const autonomousSwarm = new AutonomousSwarmSystem(autonomousBots, HUBS.autonomous, HUB_RADIUS);
     autonomousRef.current = autonomousSwarm;
+    const rlController = new TextConditionedRLController(rlAgents, 8, scene);
+    rlRef.current = rlController;
+    
+    // Load RL model
+    rlController.loadModel('/policy_text_conditioned.onnx').then((loaded) => {
+      setRlModelLoaded(loaded);
+      if (loaded) {
+        console.log('✅ RL model loaded successfully');
+        setStatus('RL model loaded! Ready to build.');
+      } else {
+        console.error('❌ RL model failed to load');
+        setStatus('RL model failed to load. Check console for errors.');
+      }
+    }).catch((error) => {
+      console.error('❌ RL model loading error:', error);
+      setRlModelLoaded(false);
+      setStatus('RL model loading error. Check console.');
+    });
 
     // Animation loop
     let last = performance.now();
@@ -392,6 +449,13 @@ export default function Page() {
 
       if (modeRef.current === 'autonomous') {
         autonomousRef.current?.update(dt);
+      } else if (modeRef.current === 'rl') {
+        // RL update is async, but we don't await to avoid blocking animation
+        rlRef.current?.update(dt).catch(err => console.error('RL update error:', err));
+        // Update match score (cheap calculation)
+        if (rlRef.current) {
+          setRlMatchScore(rlRef.current.getMatchScore());
+        }
       } else {
         swarmRef.current?.update(dt);
       }
@@ -451,11 +515,19 @@ export default function Page() {
     autonomousMeshesRef.current.forEach((mesh) => {
       mesh.visible = mode === 'autonomous';
     });
+    rlMeshesRef.current.forEach((mesh) => {
+      mesh.visible = mode === 'rl';
+    });
 
     if (mode === 'centralized') {
       swarmRef.current?.scatter();
-    } else {
+      rlRef.current?.setVisible(false);
+    } else if (mode === 'autonomous') {
       autonomousRef.current?.scatter();
+      rlRef.current?.setVisible(false);
+    } else {
+      rlRef.current?.reset();
+      rlRef.current?.setVisible(true);
     }
 
     setStatus(`${MODE_LABEL[mode]} ready. Choose a build command.`);
@@ -519,10 +591,10 @@ export default function Page() {
             {/* Mode Selection */}
             <div className="mb-4">
               <label className="text-xs text-gray-500 mb-2 block">Mode</label>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => setMode('centralized')}
-                  className={`flex-1 px-3 py-2 text-xs font-medium transition-all ${
+                  className={`px-3 py-2 text-xs font-medium transition-all ${
                     mode === 'centralized'
                       ? 'bg-red-500 text-white'
                       : 'bg-gray-900 text-gray-400 hover:bg-gray-800'
@@ -532,15 +604,41 @@ export default function Page() {
                 </button>
                 <button
                   onClick={() => setMode('autonomous')}
-                  className={`flex-1 px-3 py-2 text-xs font-medium transition-all ${
+                  className={`px-3 py-2 text-xs font-medium transition-all ${
                     mode === 'autonomous'
                       ? 'bg-red-500 text-white'
                       : 'bg-gray-900 text-gray-400 hover:bg-gray-800'
                   }`}
                 >
-                  Autonomous
+                  Auto
+                </button>
+                <button
+                  onClick={() => {
+                    if (rlModelLoaded) {
+                      setMode('rl');
+                      setStatus('RL mode activated. Generate a structure to start building.');
+                    } else {
+                      setStatus('RL model not loaded yet. Please wait...');
+                    }
+                  }}
+                  className={`px-3 py-2 text-xs font-medium transition-all ${
+                    mode === 'rl'
+                      ? 'bg-red-500 text-white'
+                      : rlModelLoaded
+                      ? 'bg-gray-900 text-gray-400 hover:bg-gray-800'
+                      : 'bg-gray-900 text-gray-600 cursor-not-allowed'
+                  }`}
+                  disabled={!rlModelLoaded}
+                  title={rlModelLoaded ? 'Switch to RL mode' : 'RL model loading...'}
+                >
+                  {rlModelLoaded ? 'RL' : 'RL...'}
                 </button>
               </div>
+              {mode === 'rl' && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Match: {(rlMatchScore * 100).toFixed(1)}%
+                </p>
+              )}
             </div>
 
             {/* Blueprint Visibility Toggle */}
