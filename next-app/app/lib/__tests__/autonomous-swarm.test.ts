@@ -63,11 +63,65 @@ class MockVector3 {
     }
     return this;
   }
+  
+  subVectors(a: MockVector3, b: MockVector3) {
+    this.x = a.x - b.x;
+    this.y = a.y - b.y;
+    this.z = a.z - b.z;
+    return this;
+  }
+  
+  dot(v: MockVector3) {
+    return this.x * v.x + this.y * v.y + this.z * v.z;
+  }
+  
+  length() {
+    return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+  }
+  
+  lengthSq() {
+    return this.x * this.x + this.y * this.y + this.z * this.z;
+  }
+  
+  divideScalar(s: number) {
+    if (s !== 0) {
+      this.x /= s;
+      this.y /= s;
+      this.z /= s;
+    }
+    return this;
+  }
+}
+
+class MockQuaternion {
+  x = 0;
+  y = 0;
+  z = 0;
+  w = 1;
+  
+  copy(q: MockQuaternion) {
+    this.x = q.x;
+    this.y = q.y;
+    this.z = q.z;
+    this.w = q.w;
+    return this;
+  }
+  
+  slerp(q: MockQuaternion, t: number) {
+    // Simple mock - just copy for testing
+    return this;
+  }
+  
+  setFromUnitVectors(from: MockVector3, to: MockVector3) {
+    // Simple mock - identity quaternion
+    return this;
+  }
 }
 
 class MockGroup {
   position = new MockVector3();
   rotation = { y: 0 };
+  quaternion = new MockQuaternion();
   
   traverse(fn: any) {
     // Do nothing - no children in mock
@@ -86,6 +140,7 @@ class MockMesh {
   Vector3: MockVector3,
   Group: MockGroup,
   Mesh: MockMesh,
+  Quaternion: MockQuaternion,
   MathUtils: {
     clamp: (val: number, min: number, max: number) => Math.max(min, Math.min(max, val)),
   },
@@ -133,6 +188,7 @@ function createMockSlot(id: number, x: number, y: number, z: number, state: 'loc
   return {
     id,
     position: new MockVector3(x, y, z) as any,
+    orientation: new MockQuaternion() as any,
     prereqIds: [],
     state,
   };
@@ -340,6 +396,101 @@ test('Scatter resets all bots', () => {
   assertEqual(bot1.state, 'idle');
   assertEqual(bot2.state, 'idle');
   assertEqual(swarm.slots.length, 0);
+});
+
+// ========== COLLISION AVOIDANCE TESTS ==========
+
+test('Bot maintains safe distance from other bots', () => {
+  const bot1 = createMockBot(0, 0, 0.3, 0);
+  const bot2 = createMockBot(1, 1, 0.3, 0); // 1 unit away
+  
+  bot1.target.set(5, 0.3, 0);
+  bot1.state = 'approaching';
+  bot2.state = 'locked'; // Make bot2 an obstacle (locked bots are checked for collision)
+  
+  const initialDistance = bot1.position.distanceTo(bot2.position);
+  
+  // Move bot1 with collision avoidance
+  bot1.move(0.1, undefined, [bot2]);
+  
+  const finalDistance = bot1.position.distanceTo(bot2.position);
+  
+  // Bot should not move directly into bot2
+  assertTrue(finalDistance >= initialDistance * 0.8, 
+    'Bot should maintain reasonable distance from other bot');
+});
+
+test('Bot detects path blocked by another bot', () => {
+  const bot1 = createMockBot(0, 0, 0.3, 0);
+  const bot2 = createMockBot(1, 2, 0.3, 0); // Directly in path
+  
+  bot1.target.set(5, 0.3, 0);
+  bot1.state = 'approaching';
+  
+  // Move with collision avoidance
+  const oldX = bot1.position.x;
+  bot1.move(0.1, undefined, [bot2]);
+  
+  // Bot should move (not be stuck)
+  assertTrue(bot1.position.x > oldX || Math.abs(bot1.position.z) > 0.01, 
+    'Bot should move when path is blocked, possibly adjusting trajectory');
+});
+
+test('Multiple bots avoid each other while assembling', () => {
+  const bots = [
+    createMockBot(0, 0, 0.3, 0),
+    createMockBot(1, 0.5, 0.3, 0),
+    createMockBot(2, 1, 0.3, 0),
+  ];
+  
+  const slots = [
+    createMockSlot(0, 5, 0.3, 0, 'available'),
+    createMockSlot(1, 5, 0.3, 1, 'available'),
+    createMockSlot(2, 5, 0.3, 2, 'available'),
+  ];
+  
+  const swarm = new AutonomousSwarmSystem(bots);
+  swarm.setSlots(slots);
+  
+  // Run simulation
+  for (let i = 0; i < 50; i++) {
+    swarm.update(0.05);
+    
+    // Check no bots are colliding (within collision radius)
+    for (let j = 0; j < bots.length; j++) {
+      for (let k = j + 1; k < bots.length; k++) {
+        const dist = bots[j].position.distanceTo(bots[k].position);
+        // Allow some tolerance for bots that might be locked in adjacent slots
+        if (bots[j].state !== 'locked' || bots[k].state !== 'locked') {
+          assertTrue(dist > 0.3 || dist < 0.001, 
+            `Bots ${j} and ${k} should not collide (dist: ${dist})`);
+        }
+      }
+    }
+  }
+});
+
+test('Bot navigates around stationary bot', () => {
+  const movingBot = createMockBot(0, 0, 0.3, 0);
+  const stationaryBot = createMockBot(1, 1.5, 0.3, 0);
+  
+  movingBot.target.set(5, 0.3, 0);
+  movingBot.state = 'approaching';
+  stationaryBot.state = 'locked';
+  
+  const initialX = movingBot.position.x;
+  const initialDist = movingBot.position.distanceTo(movingBot.target);
+  
+  // Simulate movement with collision avoidance
+  for (let i = 0; i < 50; i++) {
+    movingBot.move(0.05, undefined, [stationaryBot]);
+  }
+  
+  const finalDist = movingBot.position.distanceTo(movingBot.target);
+  
+  // Bot should have made progress toward target (even if navigating around)
+  assertTrue(finalDist < initialDist * 0.8, 
+    'Bot should navigate around obstacle and make progress toward target');
 });
 
 // Run all tests
