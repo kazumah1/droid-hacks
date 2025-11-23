@@ -17,7 +17,16 @@ I’ll annotate which person touches which file.
 - Added cinematic polish (dual point lights, ambient fill, grid helper, camera damping) plus a default pyramid build trigger so the view never feels empty.
 - Teammate-specific helpers and window globals were stripped out; this document now tracks how the Builder layer behaves so the other roles can integrate against a clean surface later.
 - Integrated Architect teammate’s logic: commands now flow through `gravitySortVoxels` → `buildSlotsFromVoxels`, and the UI can toggle between the centralized `SwarmController` and the new `AutonomousSwarmSystem` to compare behaviors.
+- Added cannon-es physics so every bot has a collider-driven body; collisions, parking, and locked structures now feel grounded while still respecting the stigmergic ordering.
 - Reinforced stigmergic realism: slots now carry discrete levels, controllers only release the next layer when the one below is filled, and locked bots ride a global transform so we can translate/rotate entire builds without breaking alignment.
+
+## Builder progress — 2025-11-23 (sliding swarm pass)
+
+- Re-tuned the physics appearance so microbots now “roll” across surfaces instead of flying: each bot samples a local surface-height field that is updated whenever a slot locks, clamps its vertical velocity, and only climbs once it reaches the target’s lateral neighborhood.
+- Enlarged the cannon-es collider radius to match the visual cube, increased bot↔bot and bot↔ground friction, and limited random unsticking impulses so collisions look like stacking cubes rather than intersecting particles.
+- Parking hubs became static piles: parking bodies switch to STATIC with full damping, bots wake with gentle lifts, and the controller now prioritizes outer bots so the depot looks like a cohesive mound.
+- Both centralized and autonomous controllers now share the same sliding heuristics plus a “surface leash” that keeps autonomous bots glued to the current substrate until they are close enough to climb, preventing the free-flight artifact that showed up in that mode.
+- Added an O(N) separation field each frame so movers gently repel each other before they ever collide, and dropped bot↔bot friction while keeping ground friction high; together the bots now roll across built voxels but slide around fellow movers instead of jamming.
 
 ---
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 // Unit tests for autonomous-swarm.ts
 // Run with: npx tsx app/lib/__tests__/autonomous-swarm.test.ts
 

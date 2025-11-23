@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 // Unit tests for slots.ts (without full Three.js setup)
 // Run with: npx tsx app/lib/__tests__/slots.test.ts
 

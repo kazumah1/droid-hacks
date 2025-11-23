@@ -9,4 +9,10 @@
 - Restored rigid-structure transforms (translate/rotate/reset) with smooth interpolation in both centralized and autonomous modes; locked bots follow structureOffset/rotation while movers respect separation + occupancy steering to avoid clipping.
 - Added voxel-occupancy collision checks plus cheap avoidance so bots arc around completed geometry instead of phasing through it, improving visual realism during construction.
 
-
+## 2025-11-23
+- Integrated cannon-es physics so each swarm mode runs inside its own physics world; bots now have rigid bodies, collide realistically, and lock into structures as static obstacles.
+- Locked bots remain transformable for blueprint “nudge/rotate” actions by driving their static bodies with the blueprint offset, while movers steer via physics velocities toward stigmergic targets.
+- Reduced spawn counts and added lint/test updates to reflect the new pipeline; the UI still presents the same commands but now benefits from grounded motion.
+- Follow-up tuning pass: bots now track a sampled surface-height field so they slide across the floor/structure, larger colliders stop visual overlap, higher friction keeps them glued to surfaces, and hub piles stay frozen until a bot is explicitly awakened.
+- Mirrored the sliding logic into the autonomous swarm and added a “surface leash”, preventing that mode’s bots from free-floating while still allowing them to climb once the lateral distance to a slot collapses.
+- Added separation steering + low-friction bot↔bot contacts so movers glide around each other before the physics solver has to resolve a collision, eliminating the visible clipping/jamming when many blue bots crowd the same corridor.

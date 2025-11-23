@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { createMicrobotMesh } from '@/app/lib/microbot';
 import { buildSlotsFromVoxels } from '@/app/lib/slots';
@@ -25,13 +26,16 @@ import {
 } from '@/app/lib/component-visualizer';
 
 const CELL_SIZE = 0.6;
-const FILL_DENSITY = 1;
 const GRID_CENTER = 4.5;
 const HUB_RADIUS = 2.5;
 const HUBS = {
   centralized: new THREE.Vector3(-9, 0.3, 0),
   autonomous: new THREE.Vector3(9, 0.3, 0),
 };
+const BOTS_PER_MODE = 700;
+const BOT_PHYSICS_RADIUS = 0.3;
+const BOT_MASS = 0.8;
+const BOT_LINEAR_DAMPING = 0.35;
 
 function randomHubPosition(center: THREE.Vector3, radius = HUB_RADIUS) {
   const angle = Math.random() * Math.PI * 2;
@@ -108,6 +112,8 @@ export default function Page() {
   const autonomousMeshesRef = useRef<THREE.Group[]>([]);
   const animationRef = useRef<number | null>(null);
   const componentVisualizationsRef = useRef<ComponentVisualization[]>([]);
+  const centralWorldRef = useRef<CANNON.World | null>(null);
+  const autonomousWorldRef = useRef<CANNON.World | null>(null);
 
   const [status, setStatus] = useState<string>('Idle');
   const [mode, setMode] = useState<'centralized' | 'autonomous'>('centralized');
@@ -127,7 +133,7 @@ export default function Page() {
           ? buildWallVoxels(params[0] ?? 10, params[1] ?? 4)
           : buildPyramidVoxels(params[0] ?? 3);
       const ordered = gravitySortVoxels(voxels);
-      const slots = buildSlotsFromVoxels(ordered, CELL_SIZE, FILL_DENSITY);
+      const slots = buildSlotsFromVoxels(ordered, CELL_SIZE);
 
       const label =
         kind === 'wall'
@@ -200,12 +206,11 @@ export default function Page() {
       // Convert to voxels and build
       const voxels = assemblyPlanToVoxels(plan);
       const ordered = gravitySortVoxels(voxels);
-      const slots = buildSlotsFromVoxels(ordered, CELL_SIZE, FILL_DENSITY);
+      const slots = buildSlotsFromVoxels(ordered, CELL_SIZE);
 
       console.log(`[Page] Pipeline: ${plan.totalVoxels} plan voxels → ${voxels.length} actual voxels → ${ordered.length} ordered → ${slots.length} slots`);
       console.log(`[Page] Active mode: ${modeRef.current}`);
 
-      const activeMode = modeRef.current;
       swarmRef.current?.setSlots(slots);
       autonomousRef.current?.setSlots(slots);
 
@@ -301,17 +306,18 @@ export default function Page() {
   }, [showStructure, setStatus]);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
 
-    const width = containerRef.current.clientWidth;
-    const height = containerRef.current.clientHeight;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
 
     // Renderer setup
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = false;
-    containerRef.current.appendChild(renderer.domElement);
+    container.appendChild(renderer.domElement);
 
     // Scene setup
     const scene = new THREE.Scene();
@@ -353,35 +359,98 @@ export default function Page() {
     grid.position.y = 0.01;
     scene.add(grid);
 
+    const createPhysicsWorld = () => {
+      const world = new CANNON.World();
+      world.gravity.set(0, -9.82, 0);
+      world.broadphase = new CANNON.SAPBroadphase(world);
+      world.allowSleep = true;
+
+      const botMaterial = new CANNON.Material('bot');
+      const groundMaterial = new CANNON.Material('ground');
+
+      const groundBody = new CANNON.Body({
+        type: CANNON.Body.STATIC,
+        shape: new CANNON.Plane(),
+        material: groundMaterial,
+      });
+      groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+      world.addBody(groundBody);
+
+      world.addContactMaterial(
+        new CANNON.ContactMaterial(botMaterial, botMaterial, {
+          friction: 0.2,
+          restitution: 0.05,
+        })
+      );
+      world.addContactMaterial(
+        new CANNON.ContactMaterial(botMaterial, groundMaterial, {
+          friction: 0.85,
+          restitution: 0,
+        })
+      );
+
+      return { world, botMaterial };
+    };
+
+    const { world: centralWorld, botMaterial: centralBotMaterial } = createPhysicsWorld();
+    const { world: autonomousWorld, botMaterial: autonomousBotMaterial } = createPhysicsWorld();
+    centralWorldRef.current = centralWorld;
+    autonomousWorldRef.current = autonomousWorld;
+
     // Create two swarms (centralized + autonomous) with their own meshes
     const centralBots: Bot[] = [];
     const autonomousBots: AutonomousBot[] = [];
     const centralMeshes: THREE.Group[] = [];
     const autonomousMeshes: THREE.Group[] = [];
-    const numBots = 3000;
+    const botShape = new CANNON.Sphere(BOT_PHYSICS_RADIUS);
 
-    for (let i = 0; i < numBots; i++) {
+    for (let i = 0; i < BOTS_PER_MODE; i++) {
+      const spawnCentral = randomHubPosition(HUBS.centralized);
       const meshCentral = createMicrobotMesh();
-      meshCentral.position.copy(randomHubPosition(HUBS.centralized));
+      meshCentral.position.copy(spawnCentral);
       meshCentral.visible = modeRef.current === 'centralized';
       scene.add(meshCentral);
-      centralBots.push(new Bot(i, meshCentral, meshCentral.position));
+      const bodyCentral = new CANNON.Body({
+        mass: BOT_MASS,
+        shape: botShape,
+        material: centralBotMaterial,
+        position: new CANNON.Vec3(spawnCentral.x, spawnCentral.y, spawnCentral.z),
+        linearDamping: BOT_LINEAR_DAMPING,
+        angularDamping: BOT_LINEAR_DAMPING,
+      });
+      centralWorld.addBody(bodyCentral);
+      centralBots.push(new Bot(i, meshCentral, bodyCentral));
       centralMeshes.push(meshCentral);
 
+      const spawnAutonomous = randomHubPosition(HUBS.autonomous);
       const meshAutonomous = createMicrobotMesh();
-      meshAutonomous.position.copy(randomHubPosition(HUBS.autonomous));
+      meshAutonomous.position.copy(spawnAutonomous);
       meshAutonomous.visible = modeRef.current === 'autonomous';
       scene.add(meshAutonomous);
-      autonomousBots.push(new AutonomousBot(i, meshAutonomous));
+      const bodyAutonomous = new CANNON.Body({
+        mass: BOT_MASS,
+        shape: botShape,
+        material: autonomousBotMaterial,
+        position: new CANNON.Vec3(spawnAutonomous.x, spawnAutonomous.y, spawnAutonomous.z),
+        linearDamping: BOT_LINEAR_DAMPING,
+        angularDamping: BOT_LINEAR_DAMPING,
+      });
+      autonomousWorld.addBody(bodyAutonomous);
+      autonomousBots.push(new AutonomousBot(i, meshAutonomous, bodyAutonomous));
       autonomousMeshes.push(meshAutonomous);
     }
 
     centralMeshesRef.current = centralMeshes;
     autonomousMeshesRef.current = autonomousMeshes;
 
-    const swarm = new SwarmController(centralBots, HUBS.centralized, HUB_RADIUS);
+    const swarm = new SwarmController(centralBots, centralWorld, HUBS.centralized, HUB_RADIUS);
     swarmRef.current = swarm;
-    const autonomousSwarm = new AutonomousSwarmSystem(autonomousBots, HUBS.autonomous, HUB_RADIUS);
+    const autonomousSwarm = new AutonomousSwarmSystem(
+      autonomousBots,
+      autonomousWorld,
+      HUBS.autonomous,
+      HUB_RADIUS
+    );
     autonomousRef.current = autonomousSwarm;
 
     // Animation loop
@@ -436,8 +505,8 @@ export default function Page() {
       });
       
       renderer.dispose();
-      if (containerRef.current?.contains(renderer.domElement)) {
-        containerRef.current.removeChild(renderer.domElement);
+      if (container.contains(renderer.domElement)) {
+        container.removeChild(renderer.domElement);
       }
     };
   }, [handleBuild]);

@@ -28,11 +28,7 @@ export interface Slot {
  */
 const GRID_CENTER = 24.5; // center of 0-49 grid
 
-export function buildSlotsFromVoxels(
-  ordered: OrderedVoxel[],
-  cellSize = 0.6,
-  fillDensity = 1
-): Slot[] {
+export function buildSlotsFromVoxels(ordered: OrderedVoxel[], cellSize = 0.6): Slot[] {
   console.log(`[Slots] Building slots from ${ordered.length} ordered voxels`);
   
   const slots: Slot[] = [];
@@ -123,7 +119,7 @@ export function buildSlotsFromVoxels(
  * 
  * @param slots - Array of slots to update
  */
-export function updateAvailableSlots(slots: Slot[], _unused?: number) {
+export function updateAvailableSlots(slots: Slot[]) {
   for (const slot of slots) {
     if (slot.state !== 'locked') continue;
     

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 // Unit tests for stigmergy.ts
 // Run with: npx tsx app/lib/__tests__/stigmergy.test.ts
 // Or: node --loader ts-node/esm app/lib/__tests__/stigmergy.test.ts
