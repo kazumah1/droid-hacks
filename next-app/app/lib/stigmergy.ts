@@ -9,6 +9,7 @@ export interface Voxel {
 
 export interface OrderedVoxel extends Voxel {
   index: number;
+  level: number;
 }
 
 /**
@@ -69,7 +70,7 @@ export function gravitySortVoxels(voxels: Voxel[]): OrderedVoxel[] {
 
     for (const [k, v] of frontier) {
       remaining.delete(k);
-      const ov: OrderedVoxel = { ...v, index: idx++ };
+      const ov: OrderedVoxel = { ...v, index: idx++, level: v.y };
       placed.set(k, ov);
       order.push(ov);
     }

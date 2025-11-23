@@ -10,9 +10,12 @@ export interface Slot {
   id: number;
   position: THREE.Vector3;
   prereqIds: number[];
+  supportIds: number[];
+  faceNeighborIds: number[];
   state: SlotState;
   normal: THREE.Vector3;
   orientation: THREE.Quaternion;
+  level: number;
 }
 
 /**
@@ -55,9 +58,12 @@ export function buildSlotsFromVoxels(
       id: slots.length,
       position: pos,
       prereqIds: [],
+      supportIds: [],
+      faceNeighborIds: [],
       state: 'locked',
       normal: upwardNormal.clone(),
       orientation: identityOrientation.clone(),
+      level: voxel.y ?? 0,
     };
 
     slots.push(slot);
@@ -79,7 +85,29 @@ export function buildSlotsFromVoxels(
     }
   });
 
-  // Initialize: base layer and any slot with satisfied prereqs become available
+  // Populate support + face neighbor dependencies
+  slots.forEach((slot, idx) => {
+    const voxel = slotVoxels[idx];
+    const addIds = (pos: { x: number; y: number; z: number }, target: number[]) => {
+      const ids = keyToSlotIds.get(key(pos));
+      if (ids?.length) target.push(...ids);
+    };
+
+    if (voxel.y > 0) {
+      addIds({ x: voxel.x, y: voxel.y - 1, z: voxel.z }, slot.supportIds);
+    }
+
+    // face neighbors (±x, ±z, and below)
+    [
+      { x: voxel.x + 1, y: voxel.y, z: voxel.z },
+      { x: voxel.x - 1, y: voxel.y, z: voxel.z },
+      { x: voxel.x, y: voxel.y, z: voxel.z + 1 },
+      { x: voxel.x, y: voxel.y, z: voxel.z - 1 },
+      { x: voxel.x, y: voxel.y - 1, z: voxel.z },
+    ].forEach((pos) => addIds(pos, slot.faceNeighborIds));
+  });
+
+  // Initialize availability
   updateAvailableSlots(slots);
 
   const availableCount = slots.filter(s => s.state === 'available').length;
@@ -95,18 +123,23 @@ export function buildSlotsFromVoxels(
  * 
  * @param slots - Array of slots to update
  */
-export function updateAvailableSlots(slots: Slot[]) {
+export function updateAvailableSlots(slots: Slot[], _unused?: number) {
   for (const slot of slots) {
     if (slot.state !== 'locked') continue;
     
-    if (slot.prereqIds.length === 0) {
-      // No prerequisites - ground level, immediately available
-      slot.state = 'available';
-      continue;
-    }
-    
-    const ready = slot.prereqIds.every(id => slots[id].state === 'filled');
-    if (ready) {
+    const hasGround = slot.level === 0;
+
+    const verticalReady =
+      slot.supportIds.length === 0 || slot.supportIds.every(id => slots[id].state === 'filled');
+    if (!hasGround && !verticalReady) continue;
+
+    const faceReady =
+      hasGround ||
+      (slot.faceNeighborIds.length === 0
+        ? verticalReady
+        : slot.faceNeighborIds.some(id => slots[id].state === 'filled'));
+
+    if (faceReady) {
       slot.state = 'available';
     }
   }
