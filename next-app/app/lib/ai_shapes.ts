@@ -48,7 +48,7 @@ export async function generateShapeFromText(prompt: string): Promise<Vector3[]> 
     if (!coords || coords.length === 0) {
       return lower.includes('wall') ? generateFallbackWall() : generateFallbackPyramid();
     }
-    const dense = densifyCoords(coords, MIN_VOXELS);
+    const dense = ensureGroundedVoxels(densifyCoords(coords, MIN_VOXELS));
     return dense.map((c) => ({
       x: c.x * CELL_SIZE,
       y: c.y * CELL_SIZE,
@@ -134,6 +134,21 @@ function densifyCoords(coords: RawCoord[], minVoxels = MIN_VOXELS): RawCoord[] {
     }
   }
 
+  return Array.from(set).map((key) => {
+    const [x, y, z] = key.split(',').map(Number);
+    return { x, y, z };
+  });
+}
+
+function ensureGroundedVoxels(coords: RawCoord[]): RawCoord[] {
+  const set = new Set(coords.map((v) => `${v.x},${v.y},${v.z}`));
+  coords.forEach((voxel) => {
+    for (let y = voxel.y - 1; y >= GRID_MIN; y--) {
+      const key = `${voxel.x},${y},${voxel.z}`;
+      if (set.has(key)) break;
+      set.add(key);
+    }
+  });
   return Array.from(set).map((key) => {
     const [x, y, z] = key.split(',').map(Number);
     return { x, y, z };

@@ -266,13 +266,7 @@ export function assemblyPlanToVoxels(plan: AssemblyPlan): Voxel[] {
     console.log(`Component "${component.name}": ${component.voxels.length} voxels`);
     allVoxels.push(...component.voxels);
   });
-  console.log(`Total voxels before deduplication: ${allVoxels.length}`);
-  
-  // Deduplicate voxels (components might overlap)
-  const deduplicated = dedupeVoxels(allVoxels);
-  console.log(`Total voxels after deduplication: ${deduplicated.length}`);
-  
-  return deduplicated;
+  return ensureGroundedVoxels(scaleVoxelsToPlayableGrid(allVoxels));
 }
 
 /**
@@ -384,4 +378,22 @@ function dedupeVoxels(voxels: Voxel[]): Voxel[] {
 }
 
 // Removed: scaleVoxelsToPlayableGrid - structures now use full 0-49 grid
+
+function ensureGroundedVoxels(voxels: Voxel[]): Voxel[] {
+  const set = new Set(voxels.map(v => `${v.x},${v.y},${v.z}`));
+  const additions: Voxel[] = [];
+
+  voxels.forEach(voxel => {
+    for (let y = voxel.y - 1; y >= 0; y--) {
+      const key = `${voxel.x},${y},${voxel.z}`;
+      if (set.has(key)) break;
+      const support = { x: voxel.x, y, z: voxel.z };
+      set.add(key);
+      additions.push(support);
+    }
+  });
+
+  if (additions.length === 0) return voxels;
+  return dedupeVoxels([...voxels, ...additions]);
+}
 

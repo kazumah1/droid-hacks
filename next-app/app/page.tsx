@@ -241,6 +241,22 @@ export default function Page() {
     setStatus('Assembly instructions printed to console');
   }, [lastAssemblyPlan, setStatus]);
 
+  const handleTranslateStructure = useCallback((dx: number, dy: number, dz: number) => {
+    swarmRef.current?.translateStructure(dx, dy, dz);
+    autonomousRef.current?.translateStructure(dx, dy, dz);
+  }, []);
+
+  const handleRotateStructure = useCallback((degY: number) => {
+    const angle = THREE.MathUtils.degToRad(degY);
+    swarmRef.current?.rotateStructureY(angle);
+    autonomousRef.current?.rotateStructureY(angle);
+  }, []);
+
+  const handleResetStructureTransform = useCallback(() => {
+    swarmRef.current?.resetStructureTransform();
+    autonomousRef.current?.resetStructureTransform();
+  }, []);
+
   const handleLoadJSON = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -566,6 +582,51 @@ export default function Page() {
               >
                 Scatter Bots
               </button>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleTranslateStructure(0, 0, 0.5)}
+                  className="px-3 py-1.5 bg-emerald-600/80 hover:bg-emerald-600 rounded text-xs font-medium transition-all"
+                >
+                  Nudge +Z
+                </button>
+                <button
+                  onClick={() => handleTranslateStructure(0, 0, -0.5)}
+                  className="px-3 py-1.5 bg-emerald-600/80 hover:bg-emerald-600 rounded text-xs font-medium transition-all"
+                >
+                  Nudge -Z
+                </button>
+                <button
+                  onClick={() => handleTranslateStructure(0.5, 0, 0)}
+                  className="px-3 py-1.5 bg-emerald-600/80 hover:bg-emerald-600 rounded text-xs font-medium transition-all"
+                >
+                  Nudge +X
+                </button>
+                <button
+                  onClick={() => handleTranslateStructure(-0.5, 0, 0)}
+                  className="px-3 py-1.5 bg-emerald-600/80 hover:bg-emerald-600 rounded text-xs font-medium transition-all"
+                >
+                  Nudge -X
+                </button>
+                <button
+                  onClick={() => handleRotateStructure(10)}
+                  className="px-3 py-1.5 bg-amber-500/80 hover:bg-amber-500 rounded text-xs font-medium transition-all"
+                >
+                  Rotate +10°
+                </button>
+                <button
+                  onClick={() => handleRotateStructure(-10)}
+                  className="px-3 py-1.5 bg-amber-500/80 hover:bg-amber-500 rounded text-xs font-medium transition-all"
+                >
+                  Rotate -10°
+                </button>
+                <button
+                  onClick={handleResetStructureTransform}
+                  className="col-span-2 px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-gray-300 text-xs transition-all border border-gray-800"
+                >
+                  Reset Transform
+                </button>
+              </div>
               
               <label className="w-full px-3 py-2 bg-gray-900 hover:bg-gray-800 text-gray-300 text-sm transition-all border border-gray-800 cursor-pointer flex items-center justify-center">
                 Load JSON File
