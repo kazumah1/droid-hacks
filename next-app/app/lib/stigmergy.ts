@@ -20,10 +20,13 @@ export interface OrderedVoxel extends Voxel {
  * determines what upper blocks can be placed next.
  */
 export function gravitySortVoxels(voxels: Voxel[]): OrderedVoxel[] {
+  console.log(`[Stigmergy] Input voxels: ${voxels.length}`);
+  
   const remaining = new Map<string, Voxel>();
   const key = (v: Voxel) => `${v.x},${v.y},${v.z}`;
 
   voxels.forEach(v => remaining.set(key(v), v));
+  console.log(`[Stigmergy] Unique voxels after key mapping: ${remaining.size}`);
 
   const placed = new Map<string, OrderedVoxel>();
   const order: OrderedVoxel[] = [];
@@ -72,6 +75,7 @@ export function gravitySortVoxels(voxels: Voxel[]): OrderedVoxel[] {
     }
   }
 
+  console.log(`[Stigmergy] Output ordered voxels: ${order.length}`);
   return order;
 }
 

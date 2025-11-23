@@ -19,8 +19,13 @@ export class AutonomousBot {
   claimedSlotId: number | null = null;
   
   // Autonomous behavior parameters
-  searchRadius = 15.0; // How far the bot can "see"
+  searchRadius = 50.0; // How far the bot can "see" (increased for 0-49 grid)
   speed = 12.0; // Movement speed (faster assembly)
+  
+  // Collision avoidance parameters
+  collisionRadius = 0.8; // Minimum safe distance from other bots
+  separationForce = 5.0; // Strength of repulsion from nearby bots
+  avoidanceRadius = 2.0; // Distance at which to start avoiding other bots
   
   // Memory (simple cognitive model)
   lastDecisionTime = -Infinity; // Start with immediate first decision
@@ -81,9 +86,9 @@ export class AutonomousBot {
         .map(b => b.claimedSlotId!)
     );
 
-    // Find nearest unclaimed slot within search radius
+    // Find nearest unclaimed slot (no search radius limit - bots can see all available slots)
     let nearestSlot: Slot | null = null;
-    let nearestDist = this.searchRadius;
+    let nearestDist = Infinity;
 
     for (const slot of availableSlots) {
       if (claimedSlotIds.has(slot.id)) continue;
@@ -104,9 +109,93 @@ export class AutonomousBot {
   }
 
   /**
-   * Move the bot (called every frame)
+   * Calculate separation force from nearby bots (collision avoidance)
    */
-  move(dt: number, slotOrientation?: THREE.Quaternion) {
+  private calculateSeparation(otherBots: AutonomousBot[], toTarget: THREE.Vector3): THREE.Vector3 {
+    const separation = new THREE.Vector3();
+    let neighborCount = 0;
+
+    for (const other of otherBots) {
+      if (other.id === this.id) continue;
+      
+      const distance = this.position.distanceTo(other.position);
+      
+      // Apply repulsion force from nearby bots
+      if (distance < this.avoidanceRadius && distance > 0.001) {
+        const repulsion = new THREE.Vector3()
+          .subVectors(this.position, other.position);
+        
+        // If other bot is locked, it won't move, so use stronger avoidance
+        const strengthMultiplier = other.state === 'locked' ? 1.2 : 1.0;
+        
+        repulsion.normalize().multiplyScalar(
+          (this.separationForce / distance) * strengthMultiplier
+        );
+        
+        // Bias avoidance perpendicular to target direction to maintain forward progress
+        // This ensures we go "around" rather than "backwards"
+        const forwardComponent = repulsion.dot(toTarget);
+        if (forwardComponent < -0.5) {
+          // If repulsion is pushing us backwards, redirect it perpendicular
+          const perpendicular = new THREE.Vector3(-toTarget.z, 0, toTarget.x);
+          if (repulsion.dot(perpendicular) < 0) {
+            perpendicular.negate();
+          }
+          repulsion.copy(perpendicular).multiplyScalar(this.separationForce / distance);
+        }
+        
+        separation.add(repulsion);
+        neighborCount++;
+      }
+    }
+
+    if (neighborCount > 0) {
+      separation.divideScalar(neighborCount);
+    }
+
+    return separation;
+  }
+
+  /**
+   * Check if the path to target is blocked by another bot
+   */
+  private isPathBlocked(otherBots: AutonomousBot[]): boolean {
+    const toTarget = new THREE.Vector3().subVectors(this.target, this.position);
+    const targetDist = toTarget.length();
+    
+    if (targetDist < 0.001) return false;
+    
+    toTarget.normalize();
+
+    for (const other of otherBots) {
+      if (other.id === this.id) continue;
+      
+      const toOther = new THREE.Vector3().subVectors(other.position, this.position);
+      const distToOther = toOther.length();
+      
+      if (distToOther < 0.001) continue;
+      
+      // Check if other bot is roughly in our path
+      const projection = toOther.dot(toTarget);
+      
+      if (projection > 0 && projection < targetDist) {
+        // Other bot is ahead of us
+        const perpDist = toOther.clone().sub(toTarget.clone().multiplyScalar(projection)).length();
+        
+        // If bot is in our way (within collision radius)
+        if (perpDist < this.collisionRadius) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Move the bot (called every frame) with collision avoidance
+   */
+  move(dt: number, slotOrientation?: THREE.Quaternion, otherBots: AutonomousBot[] = []) {
     if (this.state === 'locked') return;
 
     const dist = this.position.distanceTo(this.target);
@@ -118,13 +207,53 @@ export class AutonomousBot {
       return;
     }
 
-    // Move toward target
-    const dir = new THREE.Vector3().subVectors(this.target, this.position);
+    // Calculate desired direction toward target
+    const desiredDir = new THREE.Vector3().subVectors(this.target, this.position);
     
     if (dist > 0.001) {
-      dir.normalize();
+      desiredDir.normalize();
+      
+      let finalDir = desiredDir.clone();
+      
+      // Only apply collision avoidance when approaching assembly slots
+      // This prevents lag from O(n²) checks when bots are idle in the hub
+      if (this.state === 'approaching') {
+        // Filter to only check collision with other approaching bots and locked bots
+        const relevantBots = otherBots.filter(b => 
+          b.id !== this.id && (b.state === 'approaching' || b.state === 'locked')
+        );
+        
+        // Calculate separation force from other bots (pass target direction for smarter avoidance)
+        const separation = this.calculateSeparation(relevantBots, desiredDir);
+        const separationStrength = separation.length();
+        
+        // Adaptive blending: stronger avoidance when very close, but still make progress
+        let avoidanceWeight = 0.3; // Default weight for avoidance
+        
+        if (separationStrength > 0.001) {
+          // Check if path is blocked
+          if (this.isPathBlocked(relevantBots)) {
+            avoidanceWeight = 0.6; // Increase avoidance when blocked
+          }
+          
+          separation.normalize();
+        }
+        
+        // Blend desired direction with avoidance
+        finalDir = desiredDir.clone().multiplyScalar(1.0 - avoidanceWeight)
+          .add(separation.multiplyScalar(avoidanceWeight));
+        
+        // Normalize final direction
+        if (finalDir.lengthSq() > 0.001) {
+          finalDir.normalize();
+        } else {
+          finalDir.copy(desiredDir); // Fallback to desired direction
+        }
+      }
+      
+      // Move with collision avoidance (or simple movement if idle/searching)
       const moveDist = Math.min(dist, this.speed * dt);
-      this.position.add(dir.multiplyScalar(moveDist));
+      this.position.add(finalDir.multiplyScalar(moveDist));
       
       // Sync mesh
       this.mesh.position.copy(this.position);
@@ -272,6 +401,8 @@ export class AutonomousSwarmSystem {
   setSlots(slots: Slot[]) {
     this.slots = slots;
     
+    console.log(`[AutonomousSwarm] Received ${slots.length} slots for ${this.bots.length} bots`);
+    
     // Check for insufficient bots
     if (slots.length > this.bots.length) {
       console.warn(
@@ -308,13 +439,15 @@ export class AutonomousSwarmSystem {
       bot.think(this.slots, this.bots, this.currentTime, this.hubCenter, this.hubRadius);
     }
 
-    // Phase 2: Each bot executes movement (acting)
+    // Phase 2: Each bot executes movement (acting) with collision avoidance
+    // Note: Collision checks are optimized - only 'approaching' bots check for collisions
+    // This prevents O(n²) lag when many bots are idle in the hub
     for (const bot of this.bots) {
       const slotOrientation =
         bot.state === 'approaching' && bot.claimedSlotId !== null
           ? this.slots[bot.claimedSlotId]?.orientation
           : undefined;
-      bot.move(dt, slotOrientation);
+      bot.move(dt, slotOrientation, this.bots);
     }
 
     // Phase 3: Update environment (stigmergic signaling)
