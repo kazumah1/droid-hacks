@@ -6,25 +6,25 @@ A Next.js + Three.js simulation of programmable matter inspired by *Big Hero 6*.
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-🤖 **Claude AI Integration** - Natural language → structured component assembly
+**Claude AI Integration** - Natural language → structured component assembly
 - Breaks structures into logical components (foundation, walls, roof, etc.)
 - Generates precise 3D voxel coordinates
 - Defines build dependencies and order
 - Exports downloadable JSON assembly files
 
-🔮 **Two Swarm Modes**
+**Two Swarm Modes**
 - **Centralized Controller**: Global coordinator assigns tasks
 - **Autonomous Swarm**: Each bot makes independent decisions using stigmergy
 
-🎮 **Real-Time 3D Visualization**
+**Real-Time 3D Visualization**
 - 280 microbots with metallic bodies and glowing magnetic ends
 - Smooth animations with orbit controls
 - Cinematic lighting and fog effects
 - Component-based color visualization
 
-📋 **Stigmergy Pipeline**
+**Stigmergy Pipeline**
 - Gravity-based voxel sorting
 - Dependency-aware slot creation
 - Physical construction rules (no floating blocks)
@@ -32,7 +32,7 @@ A Next.js + Three.js simulation of programmable matter inspired by *Big Hero 6*.
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 cd next-app
@@ -58,7 +58,7 @@ See [QUICKSTART.md](./QUICKSTART.md) for detailed setup.
 
 ---
 
-## 🎯 How It Works
+## How It Works
 
 ```
 Natural Language Command
@@ -80,7 +80,7 @@ Swarm Controller
 
 ---
 
-## 🧪 Try These Commands
+## Try These Commands
 
 ### Basic Shapes
 ```
@@ -89,7 +89,7 @@ wall 10x4
 tower 8
 ```
 
-### With Claude AI (Click "✨ Generate Assembly JSON")
+### With Claude AI (Click "Generate Assembly JSON")
 ```
 build a tall observation tower with a wide base
 create a bridge connecting two platforms
@@ -100,7 +100,7 @@ build a pyramid temple with entrance stairs
 
 ---
 
-## 📦 What Gets Generated
+## What Gets Generated
 
 Claude outputs structured JSON like this:
 
@@ -136,7 +136,7 @@ Each component includes:
 
 ---
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 next-app/
@@ -148,7 +148,7 @@ next-app/
 │   │   ├── autonomous-swarm.ts       # Autonomous system
 │   │   ├── slots.ts                  # Slot-based assembly
 │   │   ├── stigmergy.ts              # Gravity sorting
-│   │   ├── ai-assembly.ts            # Claude integration ⭐
+│   │   ├── ai-assembly.ts            # Claude integration 
 │   │   └── component-visualizer.ts   # Visualization utils
 │   └── api/
 │       └── generate-assembly/        # API endpoint
@@ -160,7 +160,7 @@ next-app/
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Frontend**: Next.js 16, React 19, TypeScript
 - **3D Graphics**: Three.js with orbit controls
@@ -170,7 +170,7 @@ next-app/
 
 ---
 
-## 🎨 Component Visualization
+## Component Visualization
 
 The system can visualize each component in different colors:
 
@@ -187,7 +187,7 @@ Utilities included:
 
 ---
 
-## 📊 Example Outputs
+## Example Outputs
 
 See `next-app/examples/` for:
 - `assembly_tower.json` - Multi-level tower with observation deck
@@ -195,7 +195,7 @@ See `next-app/examples/` for:
 
 ---
 
-## 🔑 API Usage
+## API Usage
 
 ### Client-Side
 ```typescript
@@ -212,7 +212,7 @@ curl -X POST http://localhost:3000/api/generate-assembly \
 
 ---
 
-## 💡 How Swarm Modes Work
+## How Swarm Modes Work
 
 ### Centralized Mode
 - Global controller assigns slots to bots
@@ -227,7 +227,7 @@ curl -X POST http://localhost:3000/api/generate-assembly \
 
 ---
 
-## 🔬 Advanced Features
+## Advanced Features
 
 - **Dependency Graphs**: Ensures gravity-stable construction
 - **Parallel Assembly**: Independent components build simultaneously
@@ -237,7 +237,7 @@ curl -X POST http://localhost:3000/api/generate-assembly \
 
 ---
 
-## 🚨 Troubleshooting
+## Troubleshooting
 
 ### API Key Issues
 ```bash
@@ -258,7 +258,7 @@ cat next-app/.env.local
 
 ---
 
-## 🎓 Learning Resources
+## Learning Resources
 
 - [Stigmergy Explanation](https://en.wikipedia.org/wiki/Stigmergy)
 - [Three.js Documentation](https://threejs.org/docs/)
@@ -267,7 +267,7 @@ cat next-app/.env.local
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! Areas to explore:
 
@@ -280,24 +280,24 @@ Contributions welcome! Areas to explore:
 
 ---
 
-## 📝 License
+## License
 
 MIT License - See LICENSE file
 
 ---
 
-## 🎬 Demo
+## Demo
 
 Run `npm run dev` and:
 1. Watch the pyramid auto-build
 2. Try "Build Wall" button
 3. Enter custom command: `tower 8`
-4. Click "✨ Generate Assembly JSON" with command: `build a castle with towers`
+4. Click "Generate Assembly JSON" with command: `build a castle with towers`
 5. Watch Claude generate components and swarm assemble
 
 ---
 
-## 🌟 Credits
+## Credits
 
 Inspired by the microbots from *Big Hero 6* and swarm robotics research.
 
@@ -309,4 +309,4 @@ Built with:
 
 ---
 
-**Ready to build?** `npm run dev` and start creating! 🚀
+**Ready to build?** `npm run dev` and start creating!
